@@ -742,9 +742,11 @@ const DoctorPortal = () => {
                             const dayDateStr = format(day, 'yyyy-MM-dd');
                             return eventDateStr === dayDateStr;
                           }).sort((a, b) => {
-                            // Sort by priority: Call events first, then Out events
+                            // Sort by priority: Call events first, then holidays, then Out events
                             const aIsCall = a.title.toLowerCase().includes('call');
                             const bIsCall = b.title.toLowerCase().includes('call');
+                            const aIsHoliday = (a as any).isHoliday;
+                            const bIsHoliday = (b as any).isHoliday;
                             const aIsOut = a.title.toLowerCase().includes('out');
                             const bIsOut = b.title.toLowerCase().includes('out');
                             
@@ -752,11 +754,23 @@ const DoctorPortal = () => {
                             if (aIsCall && !bIsCall) return -1;
                             if (!aIsCall && bIsCall) return 1;
                             
+                            // If both are calls or neither are calls, check for holidays
+                            if (aIsCall === bIsCall) {
+                              // Holidays come after calls but before out events
+                              if (aIsHoliday && !bIsHoliday && !bIsCall) return -1;
+                              if (!aIsHoliday && bIsHoliday && !aIsCall) return 1;
+                            }
+                            
                             // Within same type, sort alphabetically
                             return a.title.localeCompare(b.title);
                           });
                           
-                          const getEventColor = (calendarId: string, isUserEvent: boolean, eventTitle: string, doctorName: string) => {
+                          const getEventColor = (calendarId: string, isUserEvent: boolean, eventTitle: string, doctorName: string, isHoliday?: boolean) => {
+                            // Check if this is a holiday
+                            if (isHoliday) {
+                              return "bg-amber-500 text-white font-medium border border-amber-600";
+                            }
+                            
                             // Check if this event contains the current doctor's name
                             const isCurrentDoctor = eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[0]) || 
                                                    eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[1]);
@@ -801,7 +815,7 @@ const DoctorPortal = () => {
                                  {dayEvents.map((event, idx) => (
                                    <div
                                      key={idx}
-                                     className={`text-xs p-1 rounded text-center ${getEventColor(event.calendarId, event.isUserEvent, event.title, doctorRecord?.name || '')}`}
+                                     className={`text-xs p-1 rounded text-center ${getEventColor(event.calendarId, event.isUserEvent, event.title, doctorRecord?.name || '', (event as any).isHoliday)}`}
                                      title={`${event.title} - ${event.calendarId.includes('odn75bvuc02onjrb0ai9oskbc4') ? 'Calendar 1' : 'Calendar 2'}`}
                                    >
                                      {event.title}

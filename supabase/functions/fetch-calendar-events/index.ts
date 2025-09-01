@@ -174,6 +174,58 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    // Fetch US holidays
+    try {
+      const currentYear = new Date().getFullYear();
+      const holidayUrl = `https://date.nager.at/api/v3/PublicHolidays/${currentYear}/US`;
+      
+      console.log(`Fetching US holidays for ${currentYear}`);
+      
+      const holidayResponse = await fetch(holidayUrl);
+      
+      if (holidayResponse.ok) {
+        const holidays = await holidayResponse.json();
+        
+        // Filter holidays to the requested time range and process them
+        const filteredHolidays = holidays.filter((holiday: any) => {
+          const holidayDate = new Date(holiday.date);
+          const timeMinDate = timeMin ? new Date(timeMin) : new Date('1900-01-01');
+          const timeMaxDate = timeMax ? new Date(timeMax) : new Date('2100-12-31');
+          return holidayDate >= timeMinDate && holidayDate <= timeMaxDate;
+        });
+        
+        const holidayEvents = filteredHolidays.map((holiday: any) => ({
+          id: `holiday_${holiday.date}`,
+          title: `🎄 ${holiday.name}`,
+          description: `US Holiday: ${holiday.name}`,
+          date: holiday.date,
+          endDate: holiday.date,
+          isAllDay: true,
+          calendarId: 'holidays',
+          isUserEvent: false,
+          isHoliday: true,
+          location: '',
+          attendees: [],
+          created: new Date().toISOString(),
+          updated: new Date().toISOString(),
+          dayOfWeek: new Date(holiday.date + 'T12:00:00').getDay(),
+          rawEvent: {
+            start: { date: holiday.date },
+            end: { date: holiday.date },
+            summary: holiday.name
+          }
+        }));
+        
+        allEvents.push(...holidayEvents);
+        console.log(`Added ${holidayEvents.length} holidays`);
+      } else {
+        console.error('Error fetching holidays:', holidayResponse.status);
+      }
+    } catch (error) {
+      console.error('Error processing holidays:', error);
+      // Continue without holidays if there's an error
+    }
+
     // Sort events by date
     allEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
