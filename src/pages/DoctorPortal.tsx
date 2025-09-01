@@ -733,13 +733,27 @@ const DoctorPortal = () => {
                             {request && status === 'submitted' && (
                               <div className="mt-2 space-y-1">
                                 {request.unavailable_dates && request.unavailable_dates.length > 0 && (
-                                  <div className="text-xs text-muted-foreground">
-                                    Unavailable: {request.unavailable_dates.length} date(s)
+                                  <div className="text-xs">
+                                    <span className="text-muted-foreground">Unavailable dates: </span>
+                                    <span className="font-medium">
+                                      {request.unavailable_dates.map((dateStr: string) => 
+                                        format(parseLocalDate(dateStr), 'MMM d')
+                                      ).join(', ')}
+                                    </span>
                                   </div>
                                 )}
                                 {request.preferred_weekends && request.preferred_weekends.length > 0 && (
-                                  <div className="text-xs text-muted-foreground">
-                                    Preferred weekends: {request.preferred_weekends.map((w: number) => `Week ${w}`).join(', ')}
+                                  <div className="text-xs">
+                                    <span className="text-muted-foreground">Preferred weekends: </span>
+                                    <span className="font-medium">
+                                      {request.preferred_weekends.map((w: number) => `Week ${w}`).join(', ')}
+                                    </span>
+                                  </div>
+                                )}
+                                {request.notes && request.notes.trim() && (
+                                  <div className="text-xs">
+                                    <span className="text-muted-foreground">Notes: </span>
+                                    <span className="font-medium">{request.notes}</span>
                                   </div>
                                 )}
                               </div>
