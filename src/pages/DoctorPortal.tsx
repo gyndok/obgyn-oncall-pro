@@ -421,7 +421,7 @@ const DoctorPortal = () => {
                               ${isSelected 
                                 ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' 
                                 : isHolidayDate
-                                  ? 'bg-warning/20 border-warning text-warning-foreground hover:bg-warning/30'
+                                  ? 'bg-accent/10 border-accent text-accent hover:bg-accent/20 font-semibold'
                                   : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'
                               }
                               ${status === 'submitted' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
@@ -450,8 +450,8 @@ const DoctorPortal = () => {
                     <span>Unavailable</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-warning/20 border-warning border rounded relative">
-                      <Star className="h-2 w-2 absolute top-0.5 right-0.5 text-warning" />
+                    <div className="w-4 h-4 bg-accent/10 border-accent border rounded relative">
+                      <Star className="h-2 w-2 absolute top-0.5 right-0.5 text-accent" />
                     </div>
                     <span>Holiday</span>
                   </div>
