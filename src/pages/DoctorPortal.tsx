@@ -292,6 +292,10 @@ const DoctorPortal = () => {
     }
   };
 
+  // Check if editing is allowed (not if block is closed/published)
+  const canEdit = currentBlock && (currentBlock.status === 'collecting');
+  const isSubmitted = status === 'submitted';
+
   if (loading) {
     return (
       <ProtectedRoute>
@@ -407,7 +411,7 @@ const DoctorPortal = () => {
                           <button
                             key={dateString}
                             type="button"
-                            disabled={status === 'submitted'}
+                            disabled={!canEdit}
                             title={holidayInfo ? holidayInfo.name : undefined}
                             onClick={() => {
                               if (isSelected) {
@@ -430,7 +434,7 @@ const DoctorPortal = () => {
                                   ? 'bg-accent/10 border-accent text-accent hover:bg-accent/20 font-semibold'
                                   : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'
                               }
-                              ${status === 'submitted' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
+                              ${!canEdit ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
                             `}
                           >
                             <div className="flex flex-col items-center justify-center h-full">
@@ -504,7 +508,7 @@ const DoctorPortal = () => {
                           setPreferredWeekends(preferredWeekends.filter(id => id !== weekend.id));
                         }
                       }}
-                      disabled={status === 'submitted'}
+                      disabled={!canEdit}
                     />
                     <Label htmlFor={`weekend-${weekend.id}`} className="flex-1 cursor-pointer">
                       <div className="font-medium">{weekend.label}</div>
@@ -531,18 +535,38 @@ const DoctorPortal = () => {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="min-h-[100px]"
-              disabled={status === 'submitted'}
+              disabled={!canEdit}
             />
           </CardContent>
         </Card>
 
-        {/* Submission Alert */}
-        {status === 'submitted' && (
+        {/* Submission Status */}
+        {isSubmitted && canEdit && (
           <Alert className="mt-6">
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
               <strong>Preferences Submitted:</strong> Your call preferences have been submitted successfully. 
-              You can view your submission details above, but cannot make changes until the next block opens.
+              You can still modify your submission until the block is closed for scheduling.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isSubmitted && !canEdit && (
+          <Alert className="mt-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Block Closed:</strong> This call block has been closed for scheduling. 
+              Your preferences are locked and cannot be modified.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!isSubmitted && !canEdit && (
+          <Alert variant="destructive" className="mt-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Block Closed:</strong> This call block has been closed. 
+              New submissions are no longer accepted.
             </AlertDescription>
           </Alert>
         )}
@@ -553,7 +577,7 @@ const DoctorPortal = () => {
             variant="outline" 
             size="lg" 
             onClick={handleSaveDraft}
-            disabled={status === 'submitted' || saving}
+            disabled={!canEdit || saving}
             className="flex-1 md:flex-none"
           >
             <Save className="h-4 w-4 mr-2" />
@@ -562,11 +586,11 @@ const DoctorPortal = () => {
           <Button 
             size="lg" 
             onClick={handleSubmit}
-            disabled={status === 'submitted' || saving}
+            disabled={!canEdit || saving}
             className="flex-1 md:flex-none bg-gradient-primary hover:opacity-90"
           >
             <Send className="h-4 w-4 mr-2" />
-            {saving ? "Submitting..." : "Submit Preferences"}
+            {saving ? "Submitting..." : (isSubmitted ? "Update Submission" : "Submit Preferences")}
           </Button>
         </div>
         </div>
