@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { format, parseISO, addDays, addWeeks, isSameDay, getYear, getMonth, getDate, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday } from "date-fns";
-import { CalendarIcon, Clock, CheckCircle, AlertTriangle, Star, Calendar as CalendarIconLucide, Save, Send, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarIcon, Clock, CheckCircle, AlertTriangle, Star, Calendar as CalendarIconLucide, Save, Send, AlertCircle, ChevronLeft, ChevronRight, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 
 // Helper function to parse date-only strings as local dates (avoiding UTC timezone issues)
 const parseLocalDate = (dateString: string) => {
@@ -62,7 +63,8 @@ const isHoliday = (date: Date) => {
 };
 
 const DoctorPortal = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [selectedUnavailableDates, setSelectedUnavailableDates] = useState<Date[]>([]);
   const [preferredWeekends, setPreferredWeekends] = useState<number[]>([]);
   const [notes, setNotes] = useState("");
@@ -398,8 +400,24 @@ const DoctorPortal = () => {
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-3xl font-bold text-foreground">Doctor Portal</h1>
-              {getStatusBadge()}
+              <div className="flex items-center space-x-4">
+                <h1 className="text-3xl font-bold text-foreground">Doctor Portal</h1>
+                <Badge variant="outline">
+                  {doctorRecord?.name || user?.email}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => navigate('/admin')}
+                    className="flex items-center gap-2"
+                  >
+                    <Settings className="h-4 w-4" />
+                    Admin Dashboard
+                  </Button>
+                )}
+              </div>
             </div>
             <p className="text-muted-foreground">Submit your time-off requests and weekend preferences for the upcoming call block.</p>
           </div>

@@ -18,7 +18,8 @@ import {
   Save,
   X,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  UserCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +40,8 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, addWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 
 // Helper function to parse date-only strings as local dates (avoiding UTC timezone issues)
 const parseLocalDate = (dateString: string) => {
@@ -47,6 +50,8 @@ const parseLocalDate = (dateString: string) => {
 };
 
 const AdminDashboard = () => {
+  const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [blocks, setBlocks] = useState<any[]>([]);
   const [currentBlock, setCurrentBlock] = useState<any>(null);
   const [doctors, setDoctors] = useState<any[]>([]);
@@ -568,7 +573,16 @@ const AdminDashboard = () => {
             <h1 className="text-3xl font-bold text-foreground mb-2">Admin Dashboard</h1>
             <p className="text-muted-foreground">Manage call blocks, monitor submissions, and generate schedules</p>
           </div>
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/doctor')}
+              className="flex items-center gap-2"
+            >
+              <UserCheck className="h-4 w-4" />
+              Switch to Doctor View
+            </Button>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-primary hover:opacity-90">
                 <Plus className="h-4 w-4 mr-2" />
@@ -611,7 +625,8 @@ const AdminDashboard = () => {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
