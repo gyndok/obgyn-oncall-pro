@@ -99,7 +99,14 @@ const handler = async (req: Request): Promise<Response> => {
               location: event.location || '',
               attendees: event.attendees || [],
               created: event.created,
-              updated: event.updated
+              updated: event.updated,
+              // Add day of week for debugging
+              dayOfWeek: new Date(startDate).getDay(), // 0=Sunday, 5=Friday, 6=Saturday
+              rawEvent: {
+                start: event.start,
+                end: event.end,
+                summary: event.summary
+              }
             };
           });
 
@@ -113,6 +120,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Sort events by date
     allEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Debug logging for weekend events
+    const fridayEvents = allEvents.filter(e => e.dayOfWeek === 5);
+    const saturdayEvents = allEvents.filter(e => e.dayOfWeek === 6);
+    console.log(`Friday events found: ${fridayEvents.length}`, fridayEvents.map(e => ({ title: e.title, date: e.date })));
+    console.log(`Saturday events found: ${saturdayEvents.length}`, saturdayEvents.map(e => ({ title: e.title, date: e.date })));
 
     console.log(`Successfully fetched ${allEvents.length} events from ${calendarIds.length} calendars`);
 

@@ -736,9 +736,11 @@ const DoctorPortal = () => {
                         return days.map((day) => {
                           const isCurrentMonth = isSameMonth(day, currentMonth);
                           const isCurrentDay = isToday(day);
-                          const dayEvents = calendarEvents.filter(event => 
-                            isSameDay(new Date(event.date), day)
-                          );
+                          const dayEvents = calendarEvents.filter(event => {
+                            const eventDate = new Date(event.date);
+                            const isSameDay = eventDate.toDateString() === day.toDateString();
+                            return isSameDay;
+                          });
                           
                           return (
                             <div
