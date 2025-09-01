@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Settings, 
   Users, 
@@ -11,7 +11,10 @@ import {
   Mail,
   Lock,
   Play,
-  Upload
+  Upload,
+  Plus,
+  Edit,
+  Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,27 +25,255 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
 import ScheduleVisualization from "@/components/ScheduleVisualization";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { supabase } from "@/integrations/supabase/client";
+import { format, addDays, addWeeks } from "date-fns";
 
 const AdminDashboard = () => {
-  const [blockLocked, setBlockLocked] = useState(false);
-  const [scheduleGenerated, setScheduleGenerated] = useState(false);
-  const [schedulePublished, setSchedulePublished] = useState(false);
+  const [blocks, setBlocks] = useState<any[]>([]);
+  const [currentBlock, setCurrentBlock] = useState<any>(null);
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [doctorRequests, setDoctorRequests] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Mock data
-  const doctors = [
-    { name: "Dr. Klein", email: "klein@clinic.com", status: "submitted", submittedAt: "2024-01-15 10:30 AM" },
-    { name: "Dr. LeBlanc", email: "leblanc@clinic.com", status: "submitted", submittedAt: "2024-01-16 2:15 PM" },
-    { name: "Dr. Johnson", email: "johnson@clinic.com", status: "in-progress", submittedAt: null },
-    { name: "Dr. Kenney", email: "kenney@clinic.com", status: "submitted", submittedAt: "2024-01-17 9:45 AM" },
-    { name: "Dr. LaBerge", email: "laberge@clinic.com", status: "not-started", submittedAt: null },
-    { name: "Dr. Clinger", email: "clinger@clinic.com", status: "submitted", submittedAt: "2024-01-16 4:20 PM" },
-    { name: "Dr. Demerson", email: "demerson@clinic.com", status: "submitted", submittedAt: "2024-01-17 11:10 AM" }
-  ];
+  // Block creation form state
+  const [newBlockStartDate, setNewBlockStartDate] = useState("");
+  const [newBlockDeadline, setNewBlockDeadline] = useState("");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  const submittedCount = doctors.filter(d => d.status === 'submitted').length;
-  const progressPercent = (submittedCount / doctors.length) * 100;
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      // Fetch blocks
+      const { data: blocksData, error: blocksError } = await supabase
+        .from('blocks')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (blocksError) throw blocksError;
+      setBlocks(blocksData || []);
+
+      // Get current active block
+      const activeBlock = blocksData?.find(block => block.status === 'collecting') || blocksData?.[0];
+      setCurrentBlock(activeBlock);
+
+      // Fetch doctors
+      const { data: doctorsData, error: doctorsError } = await supabase
+        .from('doctors')
+        .select('*')
+        .eq('active', true)
+        .order('name');
+
+      if (doctorsError) throw doctorsError;
+      setDoctors(doctorsData || []);
+
+      if (activeBlock) {
+        // Fetch doctor requests for current block
+        const { data: requestsData, error: requestsError } = await supabase
+          .from('doctor_requests')
+          .select(`
+            *,
+            doctors (name, email)
+          `)
+          .eq('block_id', activeBlock.id);
+
+        if (requestsError) throw requestsError;
+        setDoctorRequests(requestsData || []);
+
+        // Fetch assignments for current block
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('assignments')
+          .select(`
+            *,
+            doctors (name, email)
+          `)
+          .eq('block_id', activeBlock.id);
+
+        if (assignmentsError) throw assignmentsError;
+        setAssignments(assignmentsData || []);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createNewBlock = async () => {
+    if (!newBlockStartDate) {
+      toast({
+        title: "Error",
+        description: "Please select a start date",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const startDate = new Date(newBlockStartDate);
+      const endDate = addDays(addWeeks(startDate, 7), -1); // 7 weeks, ending on Sunday
+
+      const { error } = await supabase
+        .from('blocks')
+        .insert({
+          start_monday_date: format(startDate, 'yyyy-MM-dd'),
+          end_sunday_date: format(endDate, 'yyyy-MM-dd'),
+          deadline: newBlockDeadline ? new Date(newBlockDeadline).toISOString() : null,
+          status: 'collecting'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "New call block created successfully",
+      });
+
+      setShowCreateDialog(false);
+      setNewBlockStartDate("");
+      setNewBlockDeadline("");
+      fetchData();
+    } catch (error) {
+      console.error('Error creating block:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create call block",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateBlockStatus = async (blockId: string, status: string) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('blocks')
+        .update({ status })
+        .eq('id', blockId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Block status updated to ${status}`,
+      });
+
+      fetchData();
+    } catch (error) {
+      console.error('Error updating block status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update block status",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const generateSchedule = async () => {
+    if (!currentBlock) return;
+
+    setSaving(true);
+    try {
+      // Simple schedule generation algorithm
+      const blockStart = new Date(currentBlock.start_monday_date);
+      const assignments = [];
+      const availableDoctors = [...doctors];
+
+      // Create assignments for each day of the 7-week block
+      for (let week = 0; week < 7; week++) {
+        for (let day = 0; day < 7; day++) {
+          const currentDate = addDays(addWeeks(blockStart, week), day);
+          const isWeekend = day >= 5; // Friday, Saturday, Sunday
+          const weekdayName = format(currentDate, 'EEEE');
+
+          // Simple round-robin assignment (in real app, this would consider preferences)
+          const doctorIndex = (week * 7 + day) % availableDoctors.length;
+          const assignedDoctor = availableDoctors[doctorIndex];
+
+          assignments.push({
+            block_id: currentBlock.id,
+            week_index: week,
+            date: format(currentDate, 'yyyy-MM-dd'),
+            is_weekend: isWeekend,
+            weekday_name: weekdayName,
+            doctor_id: assignedDoctor.id
+          });
+        }
+      }
+
+      // Clear existing assignments for this block
+      const { error: deleteError } = await supabase
+        .from('assignments')
+        .delete()
+        .eq('block_id', currentBlock.id);
+
+      if (deleteError) throw deleteError;
+
+      // Insert new assignments
+      const { error: insertError } = await supabase
+        .from('assignments')
+        .insert(assignments);
+
+      if (insertError) throw insertError;
+
+      toast({
+        title: "Success",
+        description: "Schedule generated successfully",
+      });
+
+      fetchData();
+    } catch (error) {
+      console.error('Error generating schedule:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate schedule",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Calculate submission stats
+  const submissionStats = React.useMemo(() => {
+    const submittedCount = doctorRequests.filter(req => req.status === 'submitted').length;
+    const inProgressCount = doctorRequests.filter(req => req.status === 'in_progress').length;
+    const notStartedCount = doctors.length - doctorRequests.length;
+    const progressPercent = (submittedCount / doctors.length) * 100;
+
+    return { submittedCount, inProgressCount, notStartedCount, progressPercent };
+  }, [doctorRequests, doctors]);
+
+  // Create doctor status list
+  const doctorStatuses = React.useMemo(() => {
+    return doctors.map(doctor => {
+      const request = doctorRequests.find(req => req.doctors?.email === doctor.email);
+      return {
+        ...doctor,
+        status: request?.status || 'not_started',
+        submittedAt: request?.submitted_at ? format(new Date(request.submitted_at), 'MMM d, yyyy h:mm a') : null
+      };
+    });
+  }, [doctors, doctorRequests]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -57,14 +288,73 @@ const AdminDashboard = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <ProtectedRoute requireAdmin={true}>
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading dashboard data...</p>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
   return (
     <ProtectedRoute requireAdmin={true}>
       <div className="min-h-screen bg-background p-4">
       <div className="container mx-auto max-w-7xl">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Manage call blocks, monitor submissions, and generate schedules</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Admin Dashboard</h1>
+            <p className="text-muted-foreground">Manage call blocks, monitor submissions, and generate schedules</p>
+          </div>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-primary hover:opacity-90">
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Block
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create New Call Block</DialogTitle>
+                <DialogDescription>
+                  Set up a new 7-week call block starting on a Monday
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label htmlFor="new-start-date">Block Start Date (Monday)</Label>
+                  <Input 
+                    id="new-start-date" 
+                    type="date" 
+                    value={newBlockStartDate}
+                    onChange={(e) => setNewBlockStartDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-deadline">Submission Deadline (Optional)</Label>
+                  <Input 
+                    id="new-deadline" 
+                    type="datetime-local"
+                    value={newBlockDeadline}
+                    onChange={(e) => setNewBlockDeadline(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={createNewBlock} disabled={saving}>
+                  {saving ? "Creating..." : "Create Block"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
@@ -77,191 +367,248 @@ const AdminDashboard = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid md:grid-cols-4 gap-4">
-              <Card className="bg-gradient-card shadow-soft">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Users className="h-5 w-5 text-primary" />
-                    Submissions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-primary">{submittedCount}/7</div>
-                  <Progress value={progressPercent} className="mt-2" />
-                </CardContent>
-              </Card>
+            {currentBlock ? (
+              <>
+                {/* Stats Cards */}
+                <div className="grid md:grid-cols-4 gap-4">
+                  <Card className="bg-gradient-card shadow-soft">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Users className="h-5 w-5 text-primary" />
+                        Submissions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-primary">{submissionStats.submittedCount}/{doctors.length}</div>
+                      <Progress value={submissionStats.progressPercent} className="mt-2" />
+                    </CardContent>
+                  </Card>
 
-              <Card className="bg-gradient-card shadow-soft">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-accent" />
-                    Block Status
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-lg font-semibold">
-                    {blockLocked ? 'Locked' : 'Open'}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Deadline: Jan 29, 11:59 PM
-                  </p>
-                </CardContent>
-              </Card>
+                  <Card className="bg-gradient-card shadow-soft">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-accent" />
+                        Block Status
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg font-semibold">
+                        {currentBlock.status === 'closed' ? 'Closed' : 'Open'}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMM d, h:mm a') : 'No deadline set'}
+                      </p>
+                    </CardContent>
+                  </Card>
 
-              <Card className="bg-gradient-card shadow-soft">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Settings className="h-5 w-5 text-success" />
-                    Schedule
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-lg font-semibold">
-                    {scheduleGenerated ? 'Generated' : 'Pending'}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {scheduleGenerated ? 'Ready to publish' : 'Awaiting generation'}
-                  </p>
-                </CardContent>
-              </Card>
+                  <Card className="bg-gradient-card shadow-soft">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Settings className="h-5 w-5 text-success" />
+                        Schedule
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg font-semibold">
+                        {assignments.length > 0 ? 'Generated' : 'Pending'}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {assignments.length > 0 ? 'Ready to publish' : 'Awaiting generation'}
+                      </p>
+                    </CardContent>
+                  </Card>
 
-              <Card className="bg-gradient-card shadow-soft">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Upload className="h-5 w-5 text-warning" />
-                    Calendar
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-lg font-semibold">
-                    {schedulePublished ? 'Published' : 'Not Published'}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Google Calendar sync
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Doctor Submissions Table */}
-            <Card className="shadow-soft">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Doctor Submissions</CardTitle>
-                    <CardDescription>Track submission status for all doctors</CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      <Mail className="h-4 w-4 mr-2" />
-                      Send Reminders
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setBlockLocked(!blockLocked)}>
-                      <Lock className="h-4 w-4 mr-2" />
-                      {blockLocked ? 'Unlock' : 'Lock'} Block
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Doctor</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Submitted At</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {doctors.map((doctor) => (
-                      <TableRow key={doctor.email}>
-                        <TableCell className="font-medium">{doctor.name}</TableCell>
-                        <TableCell>{doctor.email}</TableCell>
-                        <TableCell>{getStatusBadge(doctor.status)}</TableCell>
-                        <TableCell>{doctor.submittedAt || '-'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Configure Tab */}
-          <TabsContent value="configure" className="space-y-6">
-            <Card className="shadow-soft">
-              <CardHeader>
-                <CardTitle>Block Configuration</CardTitle>
-                <CardDescription>Set up the call block parameters</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="start-date">Block Start Date (Monday)</Label>
-                    <Input id="start-date" type="date" defaultValue="2024-02-05" />
-                  </div>
-                  <div>
-                    <Label htmlFor="deadline">Submission Deadline</Label>
-                    <Input id="deadline" type="datetime-local" defaultValue="2024-01-29T23:59" />
-                  </div>
+                  <Card className="bg-gradient-card shadow-soft">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Upload className="h-5 w-5 text-warning" />
+                        Calendar
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg font-semibold">
+                        {currentBlock.status === 'published' ? 'Published' : 'Not Published'}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Google Calendar sync
+                      </p>
+                    </CardContent>
+                  </Card>
                 </div>
 
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Backend Integration Required:</strong> Block configuration, deadline management, 
-                    and automated reminders require Supabase integration for full functionality.
-                  </AlertDescription>
-                </Alert>
-
-                <Button className="bg-gradient-primary hover:opacity-90">
-                  Save Configuration
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Schedule Tab */}
-          <TabsContent value="schedule" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold">Schedule Generation</h2>
-                <p className="text-muted-foreground">Generate and validate the call schedule</p>
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  onClick={() => setScheduleGenerated(true)}
-                  disabled={submittedCount < 7 && !blockLocked}
-                  className="bg-gradient-primary hover:opacity-90"
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Generate Schedule
-                </Button>
-                <Button variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export CSV
-                </Button>
-              </div>
-            </div>
-
-            {scheduleGenerated ? (
-              <ScheduleVisualization />
+                {/* Doctor Submissions Table */}
+                <Card className="shadow-soft">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Doctor Submissions</CardTitle>
+                        <CardDescription>Track submission status for all doctors</CardDescription>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Mail className="h-4 w-4 mr-2" />
+                          Send Reminders
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => updateBlockStatus(currentBlock.id, currentBlock.status === 'closed' ? 'collecting' : 'closed')}
+                          disabled={saving}
+                        >
+                          <Lock className="h-4 w-4 mr-2" />
+                          {currentBlock.status === 'closed' ? 'Reopen' : 'Close'} Block
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Doctor</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Submitted At</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {doctorStatuses.map((doctor) => (
+                          <TableRow key={doctor.email}>
+                            <TableCell className="font-medium">{doctor.name}</TableCell>
+                            <TableCell>{doctor.email}</TableCell>
+                            <TableCell>{getStatusBadge(doctor.status)}</TableCell>
+                            <TableCell>{doctor.submittedAt || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </>
             ) : (
               <Card className="shadow-soft">
                 <CardContent className="py-16 text-center">
                   <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">No Schedule Generated</h3>
+                  <h3 className="text-xl font-semibold mb-2">No Active Call Block</h3>
                   <p className="text-muted-foreground mb-4">
-                    Generate a schedule once all doctors have submitted or you've locked the block
+                    Create a new call block to get started with managing doctor schedules
                   </p>
-                  <Button 
-                    onClick={() => setScheduleGenerated(true)}
-                    disabled={submittedCount < 7 && !blockLocked}
-                  >
-                    Generate Schedule
-                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Configure Tab */}
+          <TabsContent value="configure" className="space-y-6">
+            {currentBlock ? (
+              <Card className="shadow-soft">
+                <CardHeader>
+                  <CardTitle>Current Block Configuration</CardTitle>
+                  <CardDescription>Manage the current call block settings</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Start Date</Label>
+                      <p className="text-lg font-semibold">{format(new Date(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">End Date</Label>
+                      <p className="text-lg font-semibold">{format(new Date(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                      <div className="mt-1">
+                        <Select 
+                          value={currentBlock.status} 
+                          onValueChange={(status) => updateBlockStatus(currentBlock.id, status)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="collecting">Collecting</SelectItem>
+                            <SelectItem value="closed">Closed</SelectItem>
+                            <SelectItem value="published">Published</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {currentBlock.deadline && (
+                    <Alert>
+                      <Clock className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>Submission Deadline:</strong> {format(new Date(currentBlock.deadline), 'MMM d, yyyy h:mm a')}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="shadow-soft">
+                <CardContent className="py-16 text-center">
+                  <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">No Active Call Block</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Create a new call block to configure settings
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Schedule Tab */}
+          <TabsContent value="schedule" className="space-y-6">
+            {currentBlock ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold">Schedule Generation</h2>
+                    <p className="text-muted-foreground">Generate and validate the call schedule</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={generateSchedule}
+                      disabled={saving}
+                      className="bg-gradient-primary hover:opacity-90"
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      {saving ? "Generating..." : "Generate Schedule"}
+                    </Button>
+                    <Button variant="outline" disabled={assignments.length === 0}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Export CSV
+                    </Button>
+                  </div>
+                </div>
+
+                {assignments.length > 0 ? (
+                  <ScheduleVisualization />
+                ) : (
+                  <Card className="shadow-soft">
+                    <CardContent className="py-16 text-center">
+                      <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-xl font-semibold mb-2">No Schedule Generated</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Generate a schedule to assign doctors to call duties
+                      </p>
+                      <Button onClick={generateSchedule} disabled={saving}>
+                        {saving ? "Generating..." : "Generate Schedule"}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <Card className="shadow-soft">
+                <CardContent className="py-16 text-center">
+                  <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">No Active Call Block</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Create a call block first to generate schedules
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -279,20 +626,24 @@ const AdminDashboard = () => {
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
                     <strong>Integration Required:</strong> Google Calendar publishing requires OAuth setup 
-                    and backend integration through Supabase.
+                    and backend integration through Supabase Edge Functions.
                   </AlertDescription>
                 </Alert>
 
                 <div className="flex gap-4">
                   <Button 
-                    onClick={() => setSchedulePublished(true)}
-                    disabled={!scheduleGenerated}
+                    onClick={() => updateBlockStatus(currentBlock?.id || '', 'published')}
+                    disabled={!currentBlock || assignments.length === 0 || saving}
                     className="bg-gradient-primary hover:opacity-90"
                   >
                     <Upload className="h-4 w-4 mr-2" />
-                    Publish to Calendar
+                    {saving ? "Publishing..." : "Publish to Calendar"}
                   </Button>
-                  <Button variant="outline" disabled={!schedulePublished}>
+                  <Button 
+                    variant="outline" 
+                    disabled={!currentBlock || currentBlock.status !== 'published' || saving}
+                    onClick={() => updateBlockStatus(currentBlock?.id || '', 'closed')}
+                  >
                     Unpublish Schedule
                   </Button>
                 </div>
