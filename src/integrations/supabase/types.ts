@@ -205,8 +205,10 @@ export type Database = {
       doctors: {
         Row: {
           active: boolean
+          auth_user_id: string | null
           created_at: string
           email: string
+          first_login_at: string | null
           id: string
           is_admin: boolean
           mobile: string | null
@@ -214,8 +216,10 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          auth_user_id?: string | null
           created_at?: string
           email: string
+          first_login_at?: string | null
           id?: string
           is_admin?: boolean
           mobile?: string | null
@@ -223,8 +227,10 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          auth_user_id?: string | null
           created_at?: string
           email?: string
+          first_login_at?: string | null
           id?: string
           is_admin?: boolean
           mobile?: string | null

@@ -1013,6 +1013,7 @@ const AdminDashboard = () => {
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Account Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1026,6 +1027,16 @@ const AdminDashboard = () => {
                           <Badge variant={doctor.active ? "default" : "secondary"}>
                             {doctor.active ? 'Active' : 'Inactive'}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={doctor.first_login_at ? "default" : "destructive"}>
+                            {doctor.first_login_at ? 'Logged In' : 'Not Logged In'}
+                          </Badge>
+                          {doctor.first_login_at && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {new Date(doctor.first_login_at).toLocaleDateString()}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
