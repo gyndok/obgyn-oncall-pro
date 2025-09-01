@@ -359,7 +359,6 @@ const DoctorPortal = () => {
                         const isSelected = selectedUnavailableDates.some(
                           selectedDate => format(selectedDate, 'yyyy-MM-dd') === dateString
                         );
-                        const isWeekend = day >= 5; // Friday, Saturday, Sunday
 
                         dates.push(
                           <button
@@ -385,7 +384,6 @@ const DoctorPortal = () => {
                                 ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' 
                                 : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'
                               }
-                              ${isWeekend ? 'bg-muted/30' : ''}
                               ${status === 'submitted' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
                             `}
                           >
@@ -404,10 +402,6 @@ const DoctorPortal = () => {
 
                 {/* Legend */}
                 <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mt-4 pt-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-muted/30 border rounded"></div>
-                    <span>Weekend</span>
-                  </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-destructive border rounded"></div>
                     <span>Unavailable</span>
