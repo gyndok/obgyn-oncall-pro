@@ -524,7 +524,25 @@ const AdminDashboard = () => {
 
   const formatDateList = (dates: any[]) => {
     if (!dates || !Array.isArray(dates) || dates.length === 0) return 'None';
-    return dates.map(date => format(new Date(date), 'MMM d')).join(', ');
+    return dates.map(dateStr => {
+      // Use parseLocalDate to avoid timezone issues
+      const date = parseLocalDate(dateStr);
+      return format(date, 'MMM d');
+    }).join(', ');
+  };
+
+  const formatPreferredWeekends = (weekendNumbers: any[]) => {
+    if (!weekendNumbers || !Array.isArray(weekendNumbers) || weekendNumbers.length === 0) return 'None';
+    if (!currentBlock) return 'None';
+    
+    const startDate = parseLocalDate(currentBlock.start_monday_date);
+    
+    return weekendNumbers.map(weekNum => {
+      // Calculate the Friday of the specified weekend
+      const fridayOfWeek = addDays(startDate, (weekNum - 1) * 7 + 4); // Friday is 4 days after Monday
+      const sundayOfWeek = addDays(fridayOfWeek, 2); // Sunday is 2 days after Friday
+      return `Week ${weekNum}: ${format(fridayOfWeek, 'MMM d')}-${format(sundayOfWeek, 'd')}`;
+    }).join(', ');
   };
 
   if (loading) {
@@ -740,10 +758,10 @@ const AdminDashboard = () => {
                                          <Label className="font-medium text-muted-foreground">Unavailable Dates</Label>
                                          <p className="mt-1">{formatDateList(doctor.request.unavailable_dates)}</p>
                                        </div>
-                                       <div>
-                                         <Label className="font-medium text-muted-foreground">Preferred Weekends</Label>
-                                         <p className="mt-1">{formatDateList(doctor.request.preferred_weekends)}</p>
-                                       </div>
+                                        <div>
+                                          <Label className="font-medium text-muted-foreground">Preferred Weekends</Label>
+                                          <p className="mt-1">{formatPreferredWeekends(doctor.request.preferred_weekends)}</p>
+                                        </div>
                                        {doctor.request.notes && (
                                          <div className="md:col-span-2">
                                            <Label className="font-medium text-muted-foreground">Notes</Label>
