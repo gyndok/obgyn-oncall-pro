@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { format, parseISO, addDays, addWeeks, isSameDay, getYear, getMonth, getDate, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday } from "date-fns";
-import { CalendarIcon, Clock, CheckCircle, AlertTriangle, Star, Calendar as CalendarIconLucide, Save, Send, AlertCircle, ChevronLeft, ChevronRight, Settings } from "lucide-react";
+import { CalendarIcon, Clock, CheckCircle, AlertTriangle, Star, Calendar as CalendarIconLucide, Save, Send, AlertCircle, ChevronLeft, ChevronRight, Settings, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +75,8 @@ const DoctorPortal = () => {
   const [saving, setSaving] = useState(false);
   const [weekends, setWeekends] = useState<any[]>([]);
   const [doctorRecord, setDoctorRecord] = useState<any>(null);
+  const [allDoctorRequests, setAllDoctorRequests] = useState<any[]>([]);
+  const [allDoctors, setAllDoctors] = useState<any[]>([]);
 
   // Calendar view state
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
@@ -209,6 +211,24 @@ const DoctorPortal = () => {
             .maybeSingle();
 
           if (requestError) throw requestError;
+
+          // Fetch all doctors and their requests for team status
+          const { data: allDoctorsData, error: allDoctorsError } = await supabase
+            .from('doctors')
+            .select('*')
+            .eq('active', true)
+            .order('name');
+
+          if (allDoctorsError) throw allDoctorsError;
+          setAllDoctors(allDoctorsData || []);
+
+          const { data: allRequestsData, error: allRequestsError } = await supabase
+            .from('doctor_requests')
+            .select('*, doctors(name, email)')
+            .eq('block_id', block.id);
+
+          if (allRequestsError) throw allRequestsError;
+          setAllDoctorRequests(allRequestsData || []);
 
           if (request) {
             setDoctorRequest(request);
@@ -451,8 +471,9 @@ const DoctorPortal = () => {
           </Card>
 
           <Tabs defaultValue="preferences" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="preferences">Submit Preferences</TabsTrigger>
+              <TabsTrigger value="team-status">Team Status</TabsTrigger>
               <TabsTrigger value="schedule">Call Schedule</TabsTrigger>
             </TabsList>
 
@@ -682,6 +703,96 @@ const DoctorPortal = () => {
                   {saving ? "Submitting..." : (isSubmitted ? "Update Submission" : "Submit Preferences")}
                 </Button>
               </div>
+            </TabsContent>
+
+            {/* Team Status Tab */}
+            <TabsContent value="team-status" className="space-y-6">
+              <Card className="shadow-soft">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Team Submission Status
+                  </CardTitle>
+                  <CardDescription>
+                    View the status of all doctors' call preference submissions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {allDoctors.map((doctor) => {
+                      const request = allDoctorRequests.find(req => req.doctors?.email === doctor.email);
+                      const status = request?.status || 'not_started';
+                      
+                      return (
+                        <div key={doctor.id} className="flex items-center justify-between p-4 rounded-lg border border-border">
+                          <div className="flex-1">
+                            <div className="font-medium">{doctor.name}</div>
+                            <div className="text-sm text-muted-foreground">{doctor.email}</div>
+                            
+                            {/* Show basic request info if submitted */}
+                            {request && status === 'submitted' && (
+                              <div className="mt-2 space-y-1">
+                                {request.unavailable_dates && request.unavailable_dates.length > 0 && (
+                                  <div className="text-xs text-muted-foreground">
+                                    Unavailable: {request.unavailable_dates.length} date(s)
+                                  </div>
+                                )}
+                                {request.preferred_weekends && request.preferred_weekends.length > 0 && (
+                                  <div className="text-xs text-muted-foreground">
+                                    Preferred weekends: {request.preferred_weekends.map((w: number) => `Week ${w}`).join(', ')}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div className="ml-4">
+                            {status === 'submitted' && (
+                              <Badge variant="default" className="bg-success text-success-foreground">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Submitted
+                              </Badge>
+                            )}
+                            {status === 'in_progress' && (
+                              <Badge variant="secondary">
+                                <Clock className="h-3 w-3 mr-1" />
+                                In Progress
+                              </Badge>
+                            )}
+                            {status === 'not_started' && (
+                              <Badge variant="outline">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Not Started
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Summary Stats */}
+                  <div className="mt-6 pt-4 border-t grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-success">
+                        {allDoctorRequests.filter(req => req.status === 'submitted').length}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Submitted</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-warning">
+                        {allDoctorRequests.filter(req => req.status === 'in_progress').length}
+                      </div>
+                      <div className="text-sm text-muted-foreground">In Progress</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-muted-foreground">
+                        {allDoctors.length - allDoctorRequests.length}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Not Started</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* Schedule Tab */}
