@@ -30,6 +30,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -73,7 +74,7 @@ const AdminDashboard = () => {
   // Doctor management state
   const [showDoctorDialog, setShowDoctorDialog] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<any>(null);
-  const [doctorForm, setDoctorForm] = useState({ name: "", email: "", mobile: "" });
+  const [doctorForm, setDoctorForm] = useState({ name: "", email: "", mobile: "", is_admin: false });
 
   // Expanded rows state
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -369,10 +370,15 @@ const AdminDashboard = () => {
   const openDoctorDialog = (doctor = null) => {
     if (doctor) {
       setEditingDoctor(doctor);
-      setDoctorForm({ name: doctor.name, email: doctor.email, mobile: doctor.mobile || "" });
+      setDoctorForm({ 
+        name: doctor.name, 
+        email: doctor.email, 
+        mobile: doctor.mobile || "",
+        is_admin: doctor.is_admin || false
+      });
     } else {
       setEditingDoctor(null);
-      setDoctorForm({ name: "", email: "", mobile: "" });
+      setDoctorForm({ name: "", email: "", mobile: "", is_admin: false });
     }
     setShowDoctorDialog(true);
   };
@@ -380,7 +386,7 @@ const AdminDashboard = () => {
   const closeDoctorDialog = () => {
     setShowDoctorDialog(false);
     setEditingDoctor(null);
-    setDoctorForm({ name: "", email: "", mobile: "" });
+    setDoctorForm({ name: "", email: "", mobile: "", is_admin: false });
   };
 
   const saveDoctor = async () => {
@@ -402,7 +408,8 @@ const AdminDashboard = () => {
           .update({
             name: doctorForm.name.trim(),
             email: doctorForm.email.trim(),
-            mobile: doctorForm.mobile.trim() || null
+            mobile: doctorForm.mobile.trim() || null,
+            is_admin: doctorForm.is_admin
           })
           .eq('id', editingDoctor.id);
 
@@ -420,6 +427,7 @@ const AdminDashboard = () => {
             name: doctorForm.name.trim(),
             email: doctorForm.email.trim(),
             mobile: doctorForm.mobile.trim() || null,
+            is_admin: doctorForm.is_admin,
             active: true
           });
 
@@ -1082,6 +1090,16 @@ const AdminDashboard = () => {
                       onChange={(e) => setDoctorForm({...doctorForm, mobile: e.target.value})}
                       placeholder="+1 (555) 123-4567"
                     />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="doctor-admin"
+                      checked={doctorForm.is_admin}
+                      onCheckedChange={(checked) => 
+                        setDoctorForm({...doctorForm, is_admin: !!checked})
+                      }
+                    />
+                    <Label htmlFor="doctor-admin">Admin privileges</Label>
                   </div>
                 </div>
                 <DialogFooter>
