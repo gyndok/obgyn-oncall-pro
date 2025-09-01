@@ -14,6 +14,12 @@ import { supabase } from "@/integrations/supabase/client";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { format, addWeeks, startOfWeek, endOfWeek, addDays } from "date-fns";
 
+// Helper function to parse date-only strings as local dates (avoiding UTC timezone issues)
+const parseLocalDate = (dateString: string) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day); // month is 0-indexed
+};
+
 const DoctorPortal = () => {
   const { user } = useAuth();
   const [selectedUnavailableDates, setSelectedUnavailableDates] = useState<Date[]>([]);
@@ -69,7 +75,7 @@ const DoctorPortal = () => {
           setCurrentBlock(block);
 
           // Generate weekend options for the 7-week block
-          const startMonday = new Date(block.start_monday_date);
+          const startMonday = parseLocalDate(block.start_monday_date);
           const weekendOptions = [];
           
           for (let week = 0; week < 7; week++) {
@@ -302,11 +308,11 @@ const DoctorPortal = () => {
             <div className="grid md:grid-cols-3 gap-4">
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Start Date</Label>
-                <p className="text-lg font-semibold">{format(new Date(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
+                <p className="text-lg font-semibold">{format(parseLocalDate(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">End Date</Label>
-                <p className="text-lg font-semibold">{format(new Date(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
+                <p className="text-lg font-semibold">{format(parseLocalDate(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Submission Deadline</Label>
@@ -332,8 +338,8 @@ const DoctorPortal = () => {
                 mode="multiple"
                 selected={selectedUnavailableDates}
                 onSelect={(dates) => setSelectedUnavailableDates(dates || [])}
-                fromDate={new Date(currentBlock.start_monday_date)}
-                toDate={new Date(currentBlock.end_sunday_date)}
+                fromDate={parseLocalDate(currentBlock.start_monday_date)}
+                toDate={parseLocalDate(currentBlock.end_sunday_date)}
                 className="rounded-md border"
                 disabled={status === 'submitted'}
               />
