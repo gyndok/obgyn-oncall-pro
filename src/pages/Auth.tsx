@@ -22,7 +22,9 @@ const Auth = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
-        navigate("/");
+        // Redirect based on user role
+        const redirectPath = session.user.email === "gyndok@yahoo.com" ? "/admin" : "/doctor";
+        navigate(redirectPath);
       }
     });
 
@@ -30,7 +32,9 @@ const Auth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser(session.user);
-        navigate("/");
+        // Redirect based on user role
+        const redirectPath = session.user.email === "gyndok@yahoo.com" ? "/admin" : "/doctor";
+        navigate(redirectPath);
       } else {
         setUser(null);
       }
