@@ -816,7 +816,7 @@ const DoctorPortal = () => {
                                    <div
                                      key={idx}
                                      className={`text-[10px] p-0.5 rounded text-center leading-tight ${getEventColor(event.calendarId, event.isUserEvent, event.title, doctorRecord?.name || '', (event as any).isHoliday)}`}
-                                     title={`${event.title} - ${event.calendarId.includes('odn75bvuc02onjrb0ai9oskbc4') ? 'Calendar 1' : 'Calendar 2'}`}
+                                     title={`${event.title} - ${event.calendarId.includes('odn75bvuc02onjrb0ai9oskbc4') ? 'Staffing' : 'Call'}`}
                                    >
                                      {event.title}
                                    </div>
