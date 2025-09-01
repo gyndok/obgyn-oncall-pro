@@ -471,20 +471,26 @@ const DoctorPortal = () => {
           </Card>
 
           <Tabs defaultValue="preferences" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="preferences">Submit Preferences</TabsTrigger>
-              <TabsTrigger value="team-status">Team Status</TabsTrigger>
-              <TabsTrigger value="schedule">Call Schedule</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 h-auto">
+              <TabsTrigger value="preferences" className="text-xs sm:text-sm py-2 sm:py-2.5">
+                <span className="hidden sm:inline">Submit </span>Preferences
+              </TabsTrigger>
+              <TabsTrigger value="team-status" className="text-xs sm:text-sm py-2 sm:py-2.5">
+                <span className="hidden sm:inline">Team </span>Status
+              </TabsTrigger>
+              <TabsTrigger value="schedule" className="text-xs sm:text-sm py-2 sm:py-2.5">
+                <span className="hidden sm:inline">Call </span>Schedule
+              </TabsTrigger>
             </TabsList>
 
             {/* Preferences Tab */}
-            <TabsContent value="preferences" className="space-y-6">
-              <div className="grid lg:grid-cols-2 gap-6">
+            <TabsContent value="preferences" className="space-y-4 sm:space-y-6">
+              <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
                 {/* Unavailable Dates */}
                 <Card className="shadow-soft">
                   <CardHeader>
-                    <CardTitle>Unavailable Dates</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-lg sm:text-xl">Unavailable Dates</CardTitle>
+                    <CardDescription className="text-sm sm:text-base">
                       Select any dates you are not available for call duties (hard excludes)
                     </CardDescription>
                   </CardHeader>
@@ -494,7 +500,7 @@ const DoctorPortal = () => {
                       {/* Day Headers */}
                       <div className="grid grid-cols-7 gap-1 mb-2">
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                          <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+                          <div key={day} className="text-center text-xs sm:text-sm font-medium text-muted-foreground py-2">
                             {day}
                           </div>
                         ))}
@@ -537,19 +543,19 @@ const DoctorPortal = () => {
                                     }
                                   }}
                                   className={`
-                                    aspect-square p-1 text-sm border rounded-md transition-all relative
+                                    aspect-square p-1 sm:p-2 text-xs sm:text-sm border rounded-md transition-all relative min-h-[40px] sm:min-h-[48px]
                                     ${isSelected 
                                       ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' 
                                       : isHolidayDate
                                         ? 'bg-accent/10 border-accent text-accent hover:bg-accent/20 font-semibold'
                                         : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'
                                     }
-                                    ${!canEdit ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
+                                    ${!canEdit ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 active:scale-95'}
                                   `}
                                 >
                                   <div className="flex flex-col items-center justify-center h-full">
                                     <span className="font-medium">{format(currentDate, 'd')}</span>
-                                    <span className="text-xs opacity-75">{format(currentDate, 'MMM')}</span>
+                                    <span className="text-xs opacity-75 hidden sm:block">{format(currentDate, 'MMM')}</span>
                                     {isHolidayDate && (
                                       <Star className="h-2 w-2 absolute top-1 right-1" />
                                     )}
@@ -564,19 +570,19 @@ const DoctorPortal = () => {
                       </div>
 
                       {/* Legend */}
-                      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mt-4 pt-4 border-t">
+                      <div className="flex flex-wrap gap-3 sm:gap-4 text-xs text-muted-foreground mt-4 pt-4 border-t">
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-destructive border rounded"></div>
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-destructive border rounded"></div>
                           <span>Unavailable</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-accent/10 border-accent border rounded relative">
-                            <Star className="h-2 w-2 absolute top-0.5 right-0.5 text-accent" />
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-accent/10 border-accent border rounded relative">
+                            <Star className="h-1.5 w-1.5 sm:h-2 sm:w-2 absolute top-0.5 right-0.5 text-accent" />
                           </div>
                           <span>Holiday</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-background border rounded"></div>
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-background border rounded"></div>
                           <span>Available</span>
                         </div>
                       </div>
@@ -586,7 +592,7 @@ const DoctorPortal = () => {
                         <Label className="text-sm font-medium">Selected Unavailable Dates:</Label>
                         <div className="flex flex-wrap gap-2 mt-2">
                           {selectedUnavailableDates.map((date) => (
-                            <Badge key={date.toISOString()} variant="secondary">
+                            <Badge key={date.toISOString()} variant="secondary" className="text-xs">
                               {format(date, 'MMM d, yyyy')}
                             </Badge>
                           ))}
@@ -599,51 +605,52 @@ const DoctorPortal = () => {
                 {/* Weekend Preferences */}
                 <Card className="shadow-soft">
                   <CardHeader>
-                    <CardTitle>Weekend Preferences</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-lg sm:text-xl">Weekend Preferences</CardTitle>
+                    <CardDescription className="text-sm sm:text-base">
                       Select your preferred weekend(s) for call duties (Friday-Sunday blocks)
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                     <div className="space-y-3">
-                       {weekends.map((weekend) => {
-                         // Find doctors who have already requested this weekend
-                         const doctorsWhoRequestedWeekend = allDoctorRequests
-                           .filter(request => 
-                             request.status === 'submitted' && 
-                             Array.isArray(request.preferred_weekends) && 
-                             request.preferred_weekends.includes(weekend.id)
-                           )
-                           .map(request => request.doctors?.name)
-                           .filter(Boolean);
+                    <div className="space-y-3">
+                      {weekends.map((weekend) => {
+                        // Find doctors who have already requested this weekend
+                        const doctorsWhoRequestedWeekend = allDoctorRequests
+                          .filter(request => 
+                            request.status === 'submitted' && 
+                            Array.isArray(request.preferred_weekends) && 
+                            request.preferred_weekends.includes(weekend.id)
+                          )
+                          .map(request => request.doctors?.name)
+                          .filter(Boolean);
 
-                         return (
-                           <div key={weekend.id} className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                             <Checkbox
-                               id={`weekend-${weekend.id}`}
-                               checked={preferredWeekends.includes(weekend.id)}
-                               onCheckedChange={(checked) => {
-                                 if (checked) {
-                                   setPreferredWeekends([...preferredWeekends, weekend.id]);
-                                 } else {
-                                   setPreferredWeekends(preferredWeekends.filter(id => id !== weekend.id));
-                                 }
-                               }}
-                               disabled={!canEdit}
-                             />
-                             <Label htmlFor={`weekend-${weekend.id}`} className="flex-1 cursor-pointer">
-                               <div className="font-medium">{weekend.label}</div>
-                               <div className="text-sm text-muted-foreground">{weekend.dates}</div>
-                               {doctorsWhoRequestedWeekend.length > 0 && (
-                                 <div className="text-xs text-destructive mt-1">
-                                   Already requested by: {doctorsWhoRequestedWeekend.join(', ')}
-                                 </div>
-                               )}
-                             </Label>
-                           </div>
-                         );
-                       })}
-                     </div>
+                        return (
+                          <div key={weekend.id} className="flex items-start space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                            <Checkbox
+                              id={`weekend-${weekend.id}`}
+                              checked={preferredWeekends.includes(weekend.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setPreferredWeekends([...preferredWeekends, weekend.id]);
+                                } else {
+                                  setPreferredWeekends(preferredWeekends.filter(id => id !== weekend.id));
+                                }
+                              }}
+                              disabled={!canEdit}
+                              className="mt-0.5 flex-shrink-0"
+                            />
+                            <Label htmlFor={`weekend-${weekend.id}`} className="flex-1 cursor-pointer">
+                              <div className="font-medium text-sm sm:text-base">{weekend.label}</div>
+                              <div className="text-xs sm:text-sm text-muted-foreground">{weekend.dates}</div>
+                              {doctorsWhoRequestedWeekend.length > 0 && (
+                                <div className="text-xs text-destructive mt-1">
+                                  Already requested by: {doctorsWhoRequestedWeekend.join(', ')}
+                                </div>
+                              )}
+                            </Label>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -651,8 +658,8 @@ const DoctorPortal = () => {
               {/* Notes */}
               <Card className="shadow-soft">
                 <CardHeader>
-                  <CardTitle>Additional Notes</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-lg sm:text-xl">Additional Notes</CardTitle>
+                  <CardDescription className="text-sm sm:text-base">
                     Any additional information or special requests (optional)
                   </CardDescription>
                 </CardHeader>
@@ -661,7 +668,7 @@ const DoctorPortal = () => {
                     placeholder="Enter any additional notes or special requests..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="min-h-[100px]"
+                    className="min-h-[80px] sm:min-h-[100px] text-sm sm:text-base"
                     disabled={!canEdit}
                   />
                 </CardContent>
@@ -671,7 +678,7 @@ const DoctorPortal = () => {
               {isSubmitted && canEdit && (
                 <Alert>
                   <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>
+                  <AlertDescription className="text-sm sm:text-base">
                     <strong>Preferences Submitted:</strong> Your call preferences have been submitted successfully. 
                     You can still modify your submission until the block is closed for scheduling.
                   </AlertDescription>
@@ -681,7 +688,7 @@ const DoctorPortal = () => {
               {isSubmitted && !canEdit && (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
+                  <AlertDescription className="text-sm sm:text-base">
                     <strong>Block Closed:</strong> This call block has been closed for scheduling. 
                     Your preferences are locked and cannot be modified.
                   </AlertDescription>
@@ -691,7 +698,7 @@ const DoctorPortal = () => {
               {!isSubmitted && !canEdit && (
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
+                  <AlertDescription className="text-sm sm:text-base">
                     <strong>Block Closed:</strong> This call block has been closed. 
                     New submissions are no longer accepted.
                   </AlertDescription>
@@ -699,13 +706,13 @@ const DoctorPortal = () => {
               )}
 
               {/* Action Buttons */}
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <Button 
                   variant="outline" 
                   size="lg" 
                   onClick={handleSaveDraft}
                   disabled={!canEdit || saving}
-                  className="flex-1 md:flex-none"
+                  className="w-full sm:flex-1 sm:flex-none"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? "Saving..." : "Save Draft"}
@@ -714,7 +721,7 @@ const DoctorPortal = () => {
                   size="lg" 
                   onClick={handleSubmit}
                   disabled={!canEdit || saving}
-                  className="flex-1 md:flex-none bg-gradient-primary hover:opacity-90"
+                  className="w-full sm:flex-1 sm:flex-none bg-gradient-primary hover:opacity-90"
                 >
                   <Send className="h-4 w-4 mr-2" />
                   {saving ? "Submitting..." : (isSubmitted ? "Update Submission" : "Submit Preferences")}
@@ -735,16 +742,16 @@ const DoctorPortal = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     {allDoctors.map((doctor) => {
                       const request = allDoctorRequests.find(req => req.doctors?.email === doctor.email);
                       const status = request?.status || 'not_started';
                       
                       return (
-                        <div key={doctor.id} className="flex items-center justify-between p-4 rounded-lg border border-border">
-                          <div className="flex-1">
-                            <div className="font-medium">{doctor.name}</div>
-                            <div className="text-sm text-muted-foreground">{doctor.email}</div>
+                        <div key={doctor.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg border border-border space-y-2 sm:space-y-0">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm sm:text-base truncate">{doctor.name}</div>
+                            <div className="text-xs sm:text-sm text-muted-foreground truncate">{doctor.email}</div>
                             
                             {/* Show basic request info if submitted */}
                             {request && status === 'submitted' && (
@@ -776,21 +783,21 @@ const DoctorPortal = () => {
                               </div>
                             )}
                           </div>
-                          <div className="ml-4">
+                          <div className="flex justify-end sm:ml-4">
                             {status === 'submitted' && (
-                              <Badge variant="default" className="bg-success text-success-foreground">
+                              <Badge variant="default" className="bg-success text-success-foreground text-xs">
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 Submitted
                               </Badge>
                             )}
                             {status === 'in_progress' && (
-                              <Badge variant="secondary">
+                              <Badge variant="secondary" className="text-xs">
                                 <Clock className="h-3 w-3 mr-1" />
                                 In Progress
                               </Badge>
                             )}
                             {status === 'not_started' && (
-                              <Badge variant="outline">
+                              <Badge variant="outline" className="text-xs">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
                                 Not Started
                               </Badge>
