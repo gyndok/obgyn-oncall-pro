@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar as CalendarIcon, Save, Send, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,58 +7,253 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Calendar } from "@/components/ui/calendar";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { format, addWeeks, startOfWeek, endOfWeek, addDays } from "date-fns";
 
 const DoctorPortal = () => {
-  const [selectedUnavailableDates, setSelectedUnavailableDates] = useState<string[]>([]);
+  const { user } = useAuth();
+  const [selectedUnavailableDates, setSelectedUnavailableDates] = useState<Date[]>([]);
   const [preferredWeekends, setPreferredWeekends] = useState<number[]>([]);
   const [notes, setNotes] = useState("");
-  const [status, setStatus] = useState<'not-started' | 'in-progress' | 'submitted'>('not-started');
+  const [status, setStatus] = useState<'not_started' | 'in_progress' | 'submitted'>('not_started');
+  const [currentBlock, setCurrentBlock] = useState<any>(null);
+  const [doctorRequest, setDoctorRequest] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [weekends, setWeekends] = useState<any[]>([]);
 
-  // Mock data for 7-week block (would come from backend)
-  const blockInfo = {
-    startDate: "2024-02-05", // Monday
-    endDate: "2024-03-24", // Sunday
-    deadline: "2024-01-29 11:59 PM"
+  // Fetch current block and doctor's existing request
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return;
+
+      try {
+        // Get current active block
+        const { data: blocks, error: blockError } = await supabase
+          .from('blocks')
+          .select('*')
+          .eq('status', 'collecting')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (blockError) throw blockError;
+
+        if (blocks && blocks.length > 0) {
+          const block = blocks[0];
+          setCurrentBlock(block);
+
+          // Generate weekend options for the 7-week block
+          const startMonday = new Date(block.start_monday_date);
+          const weekendOptions = [];
+          
+          for (let week = 0; week < 7; week++) {
+            const weekStart = addWeeks(startMonday, week);
+            const friday = addDays(weekStart, 4); // Friday is 4 days after Monday
+            const sunday = addDays(weekStart, 6); // Sunday is 6 days after Monday
+            
+            weekendOptions.push({
+              id: week + 1,
+              dates: `${format(friday, 'MMM d')}-${format(sunday, 'd')}`,
+              label: `Week ${week + 1}: Friday-Sunday`,
+              friday: format(friday, 'yyyy-MM-dd'),
+              saturday: format(addDays(friday, 1), 'yyyy-MM-dd'),
+              sunday: format(sunday, 'yyyy-MM-dd')
+            });
+          }
+          setWeekends(weekendOptions);
+
+          // Get doctor's existing request for this block
+          const { data: request, error: requestError } = await supabase
+            .from('doctor_requests')
+            .select('*')
+            .eq('block_id', block.id)
+            .eq('doctor_id', user.id)
+            .maybeSingle();
+
+          if (requestError) throw requestError;
+
+          if (request) {
+            setDoctorRequest(request);
+            setSelectedUnavailableDates(
+              Array.isArray(request.unavailable_dates) 
+                ? request.unavailable_dates.map((date: string) => new Date(date))
+                : []
+            );
+            setPreferredWeekends(
+              Array.isArray(request.preferred_weekends) 
+                ? request.preferred_weekends as number[] 
+                : []
+            );
+            setNotes(request.notes || "");
+            setStatus((request.status as 'not_started' | 'in_progress' | 'submitted') || 'not_started');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load block information. Please refresh the page.",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  const handleSaveDraft = async () => {
+    if (!currentBlock || !user) return;
+    
+    setSaving(true);
+    try {
+      const requestData = {
+        block_id: currentBlock.id,
+        doctor_id: user.id,
+        unavailable_dates: selectedUnavailableDates.map(date => format(date, 'yyyy-MM-dd')),
+        preferred_weekends: preferredWeekends,
+        notes: notes,
+        status: 'in_progress',
+        updated_at: new Date().toISOString()
+      };
+
+      if (doctorRequest) {
+        // Update existing request
+        const { error } = await supabase
+          .from('doctor_requests')
+          .update(requestData)
+          .eq('id', doctorRequest.id);
+        
+        if (error) throw error;
+      } else {
+        // Create new request
+        const { data, error } = await supabase
+          .from('doctor_requests')
+          .insert([requestData])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        setDoctorRequest(data);
+      }
+
+      setStatus('in_progress');
+      toast({
+        title: "Draft Saved",
+        description: "Your preferences have been saved. You can submit when ready.",
+      });
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      toast({
+        title: "Save Failed",
+        description: "Failed to save your preferences. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const weekends = [
-    { id: 1, dates: "Feb 9-11", label: "Week 1: Friday-Sunday" },
-    { id: 2, dates: "Feb 16-18", label: "Week 2: Friday-Sunday" },
-    { id: 3, dates: "Feb 23-25", label: "Week 3: Friday-Sunday" },
-    { id: 4, dates: "Mar 1-3", label: "Week 4: Friday-Sunday" },
-    { id: 5, dates: "Mar 8-10", label: "Week 5: Friday-Sunday" },
-    { id: 6, dates: "Mar 15-17", label: "Week 6: Friday-Sunday" },
-    { id: 7, dates: "Mar 22-24", label: "Week 7: Friday-Sunday" }
-  ];
+  const handleSubmit = async () => {
+    if (!currentBlock || !user) return;
+    
+    setSaving(true);
+    try {
+      const requestData = {
+        block_id: currentBlock.id,
+        doctor_id: user.id,
+        unavailable_dates: selectedUnavailableDates.map(date => format(date, 'yyyy-MM-dd')),
+        preferred_weekends: preferredWeekends,
+        notes: notes,
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
 
-  const handleSaveDraft = () => {
-    setStatus('in-progress');
-    toast({
-      title: "Draft Saved",
-      description: "Your preferences have been saved. You can submit when ready.",
-    });
-  };
+      if (doctorRequest) {
+        // Update existing request
+        const { error } = await supabase
+          .from('doctor_requests')
+          .update(requestData)
+          .eq('id', doctorRequest.id);
+        
+        if (error) throw error;
+      } else {
+        // Create new request
+        const { data, error } = await supabase
+          .from('doctor_requests')
+          .insert([requestData])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        setDoctorRequest(data);
+      }
 
-  const handleSubmit = () => {
-    setStatus('submitted');
-    toast({
-      title: "Preferences Submitted",
-      description: "Your call preferences have been submitted successfully.",
-    });
+      setStatus('submitted');
+      toast({
+        title: "Preferences Submitted",
+        description: "Your call preferences have been submitted successfully.",
+      });
+    } catch (error) {
+      console.error('Error submitting preferences:', error);
+      toast({
+        title: "Submission Failed",
+        description: "Failed to submit your preferences. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getStatusBadge = () => {
     switch (status) {
-      case 'not-started':
+      case 'not_started':
         return <Badge variant="outline" className="border-muted-foreground"><Clock className="h-3 w-3 mr-1" />Not Started</Badge>;
-      case 'in-progress':
+      case 'in_progress':
         return <Badge variant="outline" className="border-warning text-warning"><AlertCircle className="h-3 w-3 mr-1" />In Progress</Badge>;
       case 'submitted':
         return <Badge className="bg-success text-success-foreground"><CheckCircle className="h-3 w-3 mr-1" />Submitted</Badge>;
     }
   };
+
+  if (loading) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading block information...</p>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
+  if (!currentBlock) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-background p-4">
+          <div className="container mx-auto max-w-4xl">
+            <div className="text-center py-16">
+              <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+              <h2 className="text-2xl font-bold mb-2">No Active Call Block</h2>
+              <p className="text-muted-foreground">
+                There are currently no active call blocks available for submission.
+                Please check back later or contact your administrator.
+              </p>
+            </div>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute>
@@ -85,15 +280,17 @@ const DoctorPortal = () => {
             <div className="grid md:grid-cols-3 gap-4">
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Start Date</Label>
-                <p className="text-lg font-semibold">{blockInfo.startDate}</p>
+                <p className="text-lg font-semibold">{format(new Date(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">End Date</Label>
-                <p className="text-lg font-semibold">{blockInfo.endDate}</p>
+                <p className="text-lg font-semibold">{format(new Date(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Submission Deadline</Label>
-                <p className="text-lg font-semibold text-destructive">{blockInfo.deadline}</p>
+                <p className="text-lg font-semibold text-destructive">
+                  {currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMM d, yyyy h:mm a') : 'No deadline set'}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -109,19 +306,23 @@ const DoctorPortal = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="p-4 border border-border rounded-lg bg-muted/20">
-                <p className="text-sm text-muted-foreground text-center">
-                  Interactive calendar would be here
-                  <br />
-                  (Requires Supabase backend integration)
-                </p>
-              </div>
+              <Calendar
+                mode="multiple"
+                selected={selectedUnavailableDates}
+                onSelect={(dates) => setSelectedUnavailableDates(dates || [])}
+                fromDate={new Date(currentBlock.start_monday_date)}
+                toDate={new Date(currentBlock.end_sunday_date)}
+                className="rounded-md border"
+                disabled={status === 'submitted'}
+              />
               {selectedUnavailableDates.length > 0 && (
                 <div className="mt-4">
-                  <Label className="text-sm font-medium">Selected Dates:</Label>
+                  <Label className="text-sm font-medium">Selected Unavailable Dates:</Label>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {selectedUnavailableDates.map((date) => (
-                      <Badge key={date} variant="secondary">{date}</Badge>
+                      <Badge key={date.toISOString()} variant="secondary">
+                        {format(date, 'MMM d, yyyy')}
+                      </Badge>
                     ))}
                   </div>
                 </div>
@@ -151,6 +352,7 @@ const DoctorPortal = () => {
                           setPreferredWeekends(preferredWeekends.filter(id => id !== weekend.id));
                         }
                       }}
+                      disabled={status === 'submitted'}
                     />
                     <Label htmlFor={`weekend-${weekend.id}`} className="flex-1 cursor-pointer">
                       <div className="font-medium">{weekend.label}</div>
@@ -177,17 +379,18 @@ const DoctorPortal = () => {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="min-h-[100px]"
+              disabled={status === 'submitted'}
             />
           </CardContent>
         </Card>
 
         {/* Submission Alert */}
-        {status === 'not-started' && (
+        {status === 'submitted' && (
           <Alert className="mt-6">
-            <AlertCircle className="h-4 w-4" />
+            <CheckCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Backend Integration Required:</strong> To enable form submission, time-off requests, and schedule management, 
-              you'll need to connect this project to Supabase using Lovable's native integration.
+              <strong>Preferences Submitted:</strong> Your call preferences have been submitted successfully. 
+              You can view your submission details above, but cannot make changes until the next block opens.
             </AlertDescription>
           </Alert>
         )}
@@ -198,20 +401,20 @@ const DoctorPortal = () => {
             variant="outline" 
             size="lg" 
             onClick={handleSaveDraft}
-            disabled={status === 'submitted'}
+            disabled={status === 'submitted' || saving}
             className="flex-1 md:flex-none"
           >
             <Save className="h-4 w-4 mr-2" />
-            Save Draft
+            {saving ? "Saving..." : "Save Draft"}
           </Button>
           <Button 
             size="lg" 
             onClick={handleSubmit}
-            disabled={status === 'submitted'}
+            disabled={status === 'submitted' || saving}
             className="flex-1 md:flex-none bg-gradient-primary hover:opacity-90"
           >
             <Send className="h-4 w-4 mr-2" />
-            Submit Preferences
+            {saving ? "Submitting..." : "Submit Preferences"}
           </Button>
         </div>
         </div>
