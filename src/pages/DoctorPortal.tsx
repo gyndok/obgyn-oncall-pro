@@ -605,28 +605,45 @@ const DoctorPortal = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      {weekends.map((weekend) => (
-                        <div key={weekend.id} className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                          <Checkbox
-                            id={`weekend-${weekend.id}`}
-                            checked={preferredWeekends.includes(weekend.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setPreferredWeekends([...preferredWeekends, weekend.id]);
-                              } else {
-                                setPreferredWeekends(preferredWeekends.filter(id => id !== weekend.id));
-                              }
-                            }}
-                            disabled={!canEdit}
-                          />
-                          <Label htmlFor={`weekend-${weekend.id}`} className="flex-1 cursor-pointer">
-                            <div className="font-medium">{weekend.label}</div>
-                            <div className="text-sm text-muted-foreground">{weekend.dates}</div>
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
+                     <div className="space-y-3">
+                       {weekends.map((weekend) => {
+                         // Find doctors who have already requested this weekend
+                         const doctorsWhoRequestedWeekend = allDoctorRequests
+                           .filter(request => 
+                             request.status === 'submitted' && 
+                             Array.isArray(request.preferred_weekends) && 
+                             request.preferred_weekends.includes(weekend.id)
+                           )
+                           .map(request => request.doctors?.name)
+                           .filter(Boolean);
+
+                         return (
+                           <div key={weekend.id} className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                             <Checkbox
+                               id={`weekend-${weekend.id}`}
+                               checked={preferredWeekends.includes(weekend.id)}
+                               onCheckedChange={(checked) => {
+                                 if (checked) {
+                                   setPreferredWeekends([...preferredWeekends, weekend.id]);
+                                 } else {
+                                   setPreferredWeekends(preferredWeekends.filter(id => id !== weekend.id));
+                                 }
+                               }}
+                               disabled={!canEdit}
+                             />
+                             <Label htmlFor={`weekend-${weekend.id}`} className="flex-1 cursor-pointer">
+                               <div className="font-medium">{weekend.label}</div>
+                               <div className="text-sm text-muted-foreground">{weekend.dates}</div>
+                               {doctorsWhoRequestedWeekend.length > 0 && (
+                                 <div className="text-xs text-destructive mt-1">
+                                   Already requested by: {doctorsWhoRequestedWeekend.join(', ')}
+                                 </div>
+                               )}
+                             </Label>
+                           </div>
+                         );
+                       })}
+                     </div>
                   </CardContent>
                 </Card>
               </div>
