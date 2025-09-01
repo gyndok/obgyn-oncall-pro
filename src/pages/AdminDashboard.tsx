@@ -16,7 +16,9 @@ import {
   Edit,
   Trash2,
   Save,
-  X
+  X,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,6 +69,9 @@ const AdminDashboard = () => {
   const [showDoctorDialog, setShowDoctorDialog] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<any>(null);
   const [doctorForm, setDoctorForm] = useState({ name: "", email: "", mobile: "" });
+
+  // Expanded rows state
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchData();
@@ -477,7 +482,7 @@ const AdminDashboard = () => {
     return { submittedCount, inProgressCount, notStartedCount, progressPercent };
   }, [doctorRequests, doctors]);
 
-  // Create doctor status list
+  // Create doctor status list with full request data
   const doctorStatuses = React.useMemo(() => {
     if (!Array.isArray(doctors) || !Array.isArray(doctorRequests)) {
       return [];
@@ -488,7 +493,8 @@ const AdminDashboard = () => {
       return {
         ...doctor,
         status: request?.status || 'not_started',
-        submittedAt: request?.submitted_at ? format(new Date(request.submitted_at), 'MMM d, yyyy h:mm a') : null
+        submittedAt: request?.submitted_at ? format(new Date(request.submitted_at), 'MMM d, yyyy h:mm a') : null,
+        request: request // Include full request data for expanded view
       };
     });
   }, [doctors, doctorRequests]);
@@ -504,6 +510,21 @@ const AdminDashboard = () => {
       default:
         return null;
     }
+  };
+
+  const toggleRowExpansion = (doctorEmail: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(doctorEmail)) {
+      newExpanded.delete(doctorEmail);
+    } else {
+      newExpanded.add(doctorEmail);
+    }
+    setExpandedRows(newExpanded);
+  };
+
+  const formatDateList = (dates: any[]) => {
+    if (!dates || !Array.isArray(dates) || dates.length === 0) return 'None';
+    return dates.map(date => format(new Date(date), 'MMM d')).join(', ');
   };
 
   if (loading) {
@@ -682,24 +703,61 @@ const AdminDashboard = () => {
                   </CardHeader>
                   <CardContent>
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Doctor</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Submitted At</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {doctorStatuses.map((doctor) => (
-                          <TableRow key={doctor.email}>
-                            <TableCell className="font-medium">{doctor.name}</TableCell>
-                            <TableCell>{doctor.email}</TableCell>
-                            <TableCell>{getStatusBadge(doctor.status)}</TableCell>
-                            <TableCell>{doctor.submittedAt || '-'}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
+                       <TableHeader>
+                         <TableRow>
+                           <TableHead className="w-12"></TableHead>
+                           <TableHead>Doctor</TableHead>
+                           <TableHead>Email</TableHead>
+                           <TableHead>Status</TableHead>
+                           <TableHead>Submitted At</TableHead>
+                         </TableRow>
+                       </TableHeader>
+                       <TableBody>
+                         {doctorStatuses.map((doctor) => (
+                           <React.Fragment key={doctor.email}>
+                             <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => toggleRowExpansion(doctor.email)}>
+                               <TableCell>
+                                 <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                   {expandedRows.has(doctor.email) ? (
+                                     <ChevronDown className="h-4 w-4" />
+                                   ) : (
+                                     <ChevronRight className="h-4 w-4" />
+                                   )}
+                                 </Button>
+                               </TableCell>
+                               <TableCell className="font-medium">{doctor.name}</TableCell>
+                               <TableCell>{doctor.email}</TableCell>
+                               <TableCell>{getStatusBadge(doctor.status)}</TableCell>
+                               <TableCell>{doctor.submittedAt || '-'}</TableCell>
+                             </TableRow>
+                             {expandedRows.has(doctor.email) && doctor.request && (
+                               <TableRow>
+                                 <TableCell colSpan={5} className="bg-muted/30 p-6">
+                                   <div className="space-y-4">
+                                     <h4 className="font-semibold text-sm">Request Details</h4>
+                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                       <div>
+                                         <Label className="font-medium text-muted-foreground">Unavailable Dates</Label>
+                                         <p className="mt-1">{formatDateList(doctor.request.unavailable_dates)}</p>
+                                       </div>
+                                       <div>
+                                         <Label className="font-medium text-muted-foreground">Preferred Weekends</Label>
+                                         <p className="mt-1">{formatDateList(doctor.request.preferred_weekends)}</p>
+                                       </div>
+                                       {doctor.request.notes && (
+                                         <div className="md:col-span-2">
+                                           <Label className="font-medium text-muted-foreground">Notes</Label>
+                                           <p className="mt-1 text-muted-foreground">{doctor.request.notes}</p>
+                                         </div>
+                                       )}
+                                     </div>
+                                   </div>
+                                 </TableCell>
+                               </TableRow>
+                             )}
+                           </React.Fragment>
+                         ))}
+                       </TableBody>
                     </Table>
                   </CardContent>
                 </Card>
