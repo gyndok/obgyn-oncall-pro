@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { 
   Settings, 
   Users, 
-  Calendar, 
+  Calendar as CalendarIcon, 
   Send, 
   Download, 
   CheckCircle, 
@@ -14,7 +14,9 @@ import {
   Upload,
   Plus,
   Edit,
-  Trash2
+  Trash2,
+  Save,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,11 +29,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { toast } from "@/hooks/use-toast";
 import ScheduleVisualization from "@/components/ScheduleVisualization";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, addWeeks } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const AdminDashboard = () => {
   const [blocks, setBlocks] = useState<any[]>([]);
@@ -46,6 +51,11 @@ const AdminDashboard = () => {
   const [newBlockStartDate, setNewBlockStartDate] = useState("");
   const [newBlockDeadline, setNewBlockDeadline] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  
+  // Block editing state
+  const [isEditingDates, setIsEditingDates] = useState(false);
+  const [editStartDate, setEditStartDate] = useState<Date | undefined>();
+  const [editEndDate, setEditEndDate] = useState<Date | undefined>();
 
   useEffect(() => {
     fetchData();
@@ -253,6 +263,66 @@ const AdminDashboard = () => {
     }
   };
 
+  const startEditingDates = () => {
+    if (currentBlock) {
+      setEditStartDate(new Date(currentBlock.start_monday_date));
+      setEditEndDate(new Date(currentBlock.end_sunday_date));
+      setIsEditingDates(true);
+    }
+  };
+
+  const cancelEditingDates = () => {
+    setIsEditingDates(false);
+    setEditStartDate(undefined);
+    setEditEndDate(undefined);
+  };
+
+  const saveBlockDates = async () => {
+    if (!currentBlock || !editStartDate) {
+      toast({
+        title: "Error",
+        description: "Please select valid dates",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Calculate end date as 7 weeks from start date (49 days - 1)
+    const calculatedEndDate = addDays(addWeeks(editStartDate, 7), -1);
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('blocks')
+        .update({
+          start_monday_date: format(editStartDate, 'yyyy-MM-dd'),
+          end_sunday_date: format(calculatedEndDate, 'yyyy-MM-dd')
+        })
+        .eq('id', currentBlock.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Block dates updated successfully",
+      });
+
+      setIsEditingDates(false);
+      setEditStartDate(undefined);
+      setEditEndDate(undefined);
+      fetchData();
+    } catch (error) {
+      console.error('Error updating block dates:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update block dates",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Calculate submission stats
   const submissionStats = React.useMemo(() => {
     if (!doctors.length || !Array.isArray(doctorRequests)) {
@@ -393,12 +463,12 @@ const AdminDashboard = () => {
                   </Card>
 
                   <Card className="bg-gradient-card shadow-soft">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-accent" />
-                        Block Status
-                      </CardTitle>
-                    </CardHeader>
+                     <CardHeader className="pb-3">
+                       <CardTitle className="text-lg flex items-center gap-2">
+                         <CalendarIcon className="h-5 w-5 text-accent" />
+                         Block Status
+                       </CardTitle>
+                     </CardHeader>
                     <CardContent>
                       <div className="text-lg font-semibold">
                         {currentBlock.status === 'closed' ? 'Closed' : 'Open'}
@@ -496,7 +566,7 @@ const AdminDashboard = () => {
             ) : (
               <Card className="shadow-soft">
                 <CardContent className="py-16 text-center">
-                  <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                  <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-xl font-semibold mb-2">No Active Call Block</h3>
                   <p className="text-muted-foreground mb-4">
                     Create a new call block to get started with managing doctor schedules
@@ -515,14 +585,68 @@ const AdminDashboard = () => {
                   <CardDescription>Manage the current call block settings</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">Block Dates</h3>
+                    {!isEditingDates ? (
+                      <Button variant="outline" size="sm" onClick={startEditingDates}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Dates
+                      </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={cancelEditingDates}>
+                          <X className="h-4 w-4 mr-2" />
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={saveBlockDates} disabled={saving}>
+                          <Save className="h-4 w-4 mr-2" />
+                          {saving ? "Saving..." : "Save"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="grid md:grid-cols-3 gap-4">
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Start Date</Label>
-                      <p className="text-lg font-semibold">{format(new Date(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
+                      {!isEditingDates ? (
+                        <p className="text-lg font-semibold">{format(new Date(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
+                      ) : (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal mt-1",
+                                !editStartDate && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {editStartDate ? format(editStartDate, "PPP") : <span>Pick a date</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={editStartDate}
+                              onSelect={(date) => setEditStartDate(date)}
+                              initialFocus
+                              className={cn("p-3 pointer-events-auto")}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      )}
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">End Date</Label>
-                      <p className="text-lg font-semibold">{format(new Date(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
+                      {!isEditingDates ? (
+                        <p className="text-lg font-semibold">{format(new Date(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
+                      ) : (
+                        <p className="text-lg font-semibold text-muted-foreground mt-1">
+                          {editStartDate ? format(addDays(addWeeks(editStartDate, 7), -1), 'MMM d, yyyy') : 'Auto-calculated'}
+                          <span className="block text-sm font-normal">Automatically calculated as 7 weeks from start date</span>
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Status</Label>
@@ -530,6 +654,7 @@ const AdminDashboard = () => {
                         <Select 
                           value={currentBlock.status} 
                           onValueChange={(status) => updateBlockStatus(currentBlock.id, status)}
+                          disabled={isEditingDates}
                         >
                           <SelectTrigger>
                             <SelectValue />
@@ -557,7 +682,7 @@ const AdminDashboard = () => {
             ) : (
               <Card className="shadow-soft">
                 <CardContent className="py-16 text-center">
-                  <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                  <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-xl font-semibold mb-2">No Active Call Block</h3>
                   <p className="text-muted-foreground mb-4">
                     Create a new call block to configure settings
@@ -597,22 +722,22 @@ const AdminDashboard = () => {
                 ) : (
                   <Card className="shadow-soft">
                     <CardContent className="py-16 text-center">
-                      <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-xl font-semibold mb-2">No Schedule Generated</h3>
-                      <p className="text-muted-foreground mb-4">
-                        Generate a schedule to assign doctors to call duties
-                      </p>
-                      <Button onClick={generateSchedule} disabled={saving}>
-                        {saving ? "Generating..." : "Generate Schedule"}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            ) : (
-              <Card className="shadow-soft">
-                <CardContent className="py-16 text-center">
-                  <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                       <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                       <h3 className="text-xl font-semibold mb-2">No Schedule Generated</h3>
+                       <p className="text-muted-foreground mb-4">
+                         Generate a schedule to assign doctors to call duties
+                       </p>
+                       <Button onClick={generateSchedule} disabled={saving}>
+                         {saving ? "Generating..." : "Generate Schedule"}
+                       </Button>
+                     </CardContent>
+                   </Card>
+                 )}
+               </>
+             ) : (
+               <Card className="shadow-soft">
+                 <CardContent className="py-16 text-center">
+                   <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-xl font-semibold mb-2">No Active Call Block</h3>
                   <p className="text-muted-foreground mb-4">
                     Create a call block first to generate schedules
