@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { format, parseISO, addDays, addWeeks, isSameDay, getYear, getMonth, getDate } from "date-fns";
-import { CalendarIcon, Clock, CheckCircle, AlertTriangle, Star, Calendar as CalendarIconLucide, Save, Send, AlertCircle } from "lucide-react";
+import { format, parseISO, addDays, addWeeks, isSameDay, getYear, getMonth, getDate, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday } from "date-fns";
+import { CalendarIcon, Clock, CheckCircle, AlertTriangle, Star, Calendar as CalendarIconLucide, Save, Send, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +73,11 @@ const DoctorPortal = () => {
   const [saving, setSaving] = useState(false);
   const [weekends, setWeekends] = useState<any[]>([]);
   const [doctorRecord, setDoctorRecord] = useState<any>(null);
+
+  // Calendar view state
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // Fetch current block and doctor's existing request
   useEffect(() => {
@@ -331,268 +336,418 @@ const DoctorPortal = () => {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background p-4">
-      <div className="container mx-auto max-w-4xl">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold text-foreground">Doctor Portal</h1>
-            {getStatusBadge()}
-          </div>
-          <p className="text-muted-foreground">Submit your time-off requests and weekend preferences for the upcoming call block.</p>
-        </div>
-
-        {/* Block Information */}
-        <Card className="mb-6 bg-gradient-card shadow-soft">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarIcon className="h-5 w-5" />
-              Call Block Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Start Date</Label>
-                <p className="text-lg font-semibold">{format(parseLocalDate(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">End Date</Label>
-                <p className="text-lg font-semibold">{format(parseLocalDate(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Submission Deadline</Label>
-                <p className="text-lg font-semibold text-destructive">
-                  {currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMM d, yyyy h:mm a') : 'No deadline set'}
-                </p>
-              </div>
+        <div className="container mx-auto max-w-4xl">
+          {/* Header */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-3xl font-bold text-foreground">Doctor Portal</h1>
+              {getStatusBadge()}
             </div>
-          </CardContent>
-        </Card>
+            <p className="text-muted-foreground">Submit your time-off requests and weekend preferences for the upcoming call block.</p>
+          </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Unavailable Dates */}
-          <Card className="shadow-soft">
+          {/* Block Information */}
+          <Card className="mb-6 bg-gradient-card shadow-soft">
             <CardHeader>
-              <CardTitle>Unavailable Dates</CardTitle>
-              <CardDescription>
-                Select any dates you are not available for call duties (hard excludes)
-              </CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarIcon className="h-5 w-5" />
+                Call Block Information
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Custom 7x7 Calendar Grid */}
-              <div className="space-y-4">
-                {/* Day Headers */}
-                <div className="grid grid-cols-7 gap-1 mb-2">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                    <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
-                      {day}
-                    </div>
-                  ))}
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Start Date</Label>
+                  <p className="text-lg font-semibold">{format(parseLocalDate(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
                 </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">End Date</Label>
+                  <p className="text-lg font-semibold">{format(parseLocalDate(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Submission Deadline</Label>
+                  <p className="text-lg font-semibold text-destructive">
+                    {currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMM d, yyyy h:mm a') : 'No deadline set'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-                {/* 7x7 Date Grid */}
-                <div className="grid grid-cols-7 gap-1">
-                  {(() => {
-                    const startMonday = parseLocalDate(currentBlock.start_monday_date);
-                    const dates = [];
-                    
-                    // Generate all 49 dates (7 weeks x 7 days)
-                    for (let week = 0; week < 7; week++) {
-                      for (let day = 0; day < 7; day++) {
-                        const currentDate = addDays(addWeeks(startMonday, week), day);
-                        const dateString = format(currentDate, 'yyyy-MM-dd');
-                        const isSelected = selectedUnavailableDates.some(
-                          selectedDate => format(selectedDate, 'yyyy-MM-dd') === dateString
-                        );
-                        const holidayInfo = getHolidayInfo(currentDate);
-                        const isHolidayDate = !!holidayInfo;
+          <Tabs defaultValue="preferences" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="preferences">Submit Preferences</TabsTrigger>
+              <TabsTrigger value="schedule">Call Schedule</TabsTrigger>
+            </TabsList>
 
-                        dates.push(
-                          <button
-                            key={dateString}
-                            type="button"
-                            disabled={!canEdit}
-                            title={holidayInfo ? holidayInfo.name : undefined}
-                            onClick={() => {
-                              if (isSelected) {
-                                // Remove date
-                                setSelectedUnavailableDates(
-                                  selectedUnavailableDates.filter(
-                                    selectedDate => format(selectedDate, 'yyyy-MM-dd') !== dateString
-                                  )
-                                );
+            {/* Preferences Tab */}
+            <TabsContent value="preferences" className="space-y-6">
+              <div className="grid lg:grid-cols-2 gap-6">
+                {/* Unavailable Dates */}
+                <Card className="shadow-soft">
+                  <CardHeader>
+                    <CardTitle>Unavailable Dates</CardTitle>
+                    <CardDescription>
+                      Select any dates you are not available for call duties (hard excludes)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {/* Custom 7x7 Calendar Grid */}
+                    <div className="space-y-4">
+                      {/* Day Headers */}
+                      <div className="grid grid-cols-7 gap-1 mb-2">
+                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                          <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+                            {day}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 7x7 Date Grid */}
+                      <div className="grid grid-cols-7 gap-1">
+                        {(() => {
+                          const startMonday = parseLocalDate(currentBlock.start_monday_date);
+                          const dates = [];
+                          
+                          // Generate all 49 dates (7 weeks x 7 days)
+                          for (let week = 0; week < 7; week++) {
+                            for (let day = 0; day < 7; day++) {
+                              const currentDate = addDays(addWeeks(startMonday, week), day);
+                              const dateString = format(currentDate, 'yyyy-MM-dd');
+                              const isSelected = selectedUnavailableDates.some(
+                                selectedDate => format(selectedDate, 'yyyy-MM-dd') === dateString
+                              );
+                              const holidayInfo = getHolidayInfo(currentDate);
+                              const isHolidayDate = !!holidayInfo;
+
+                              dates.push(
+                                <button
+                                  key={dateString}
+                                  type="button"
+                                  disabled={!canEdit}
+                                  title={holidayInfo ? holidayInfo.name : undefined}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      // Remove date
+                                      setSelectedUnavailableDates(
+                                        selectedUnavailableDates.filter(
+                                          selectedDate => format(selectedDate, 'yyyy-MM-dd') !== dateString
+                                        )
+                                      );
+                                    } else {
+                                      // Add date
+                                      setSelectedUnavailableDates([...selectedUnavailableDates, currentDate]);
+                                    }
+                                  }}
+                                  className={`
+                                    aspect-square p-1 text-sm border rounded-md transition-all relative
+                                    ${isSelected 
+                                      ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' 
+                                      : isHolidayDate
+                                        ? 'bg-accent/10 border-accent text-accent hover:bg-accent/20 font-semibold'
+                                        : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'
+                                    }
+                                    ${!canEdit ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
+                                  `}
+                                >
+                                  <div className="flex flex-col items-center justify-center h-full">
+                                    <span className="font-medium">{format(currentDate, 'd')}</span>
+                                    <span className="text-xs opacity-75">{format(currentDate, 'MMM')}</span>
+                                    {isHolidayDate && (
+                                      <Star className="h-2 w-2 absolute top-1 right-1" />
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            }
+                          }
+                          
+                          return dates;
+                        })()}
+                      </div>
+
+                      {/* Legend */}
+                      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mt-4 pt-4 border-t">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-destructive border rounded"></div>
+                          <span>Unavailable</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-accent/10 border-accent border rounded relative">
+                            <Star className="h-2 w-2 absolute top-0.5 right-0.5 text-accent" />
+                          </div>
+                          <span>Holiday</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-background border rounded"></div>
+                          <span>Available</span>
+                        </div>
+                      </div>
+                    </div>
+                    {selectedUnavailableDates.length > 0 && (
+                      <div className="mt-4">
+                        <Label className="text-sm font-medium">Selected Unavailable Dates:</Label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {selectedUnavailableDates.map((date) => (
+                            <Badge key={date.toISOString()} variant="secondary">
+                              {format(date, 'MMM d, yyyy')}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Weekend Preferences */}
+                <Card className="shadow-soft">
+                  <CardHeader>
+                    <CardTitle>Weekend Preferences</CardTitle>
+                    <CardDescription>
+                      Select your preferred weekend(s) for call duties (Friday-Sunday blocks)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {weekends.map((weekend) => (
+                        <div key={weekend.id} className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                          <Checkbox
+                            id={`weekend-${weekend.id}`}
+                            checked={preferredWeekends.includes(weekend.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setPreferredWeekends([...preferredWeekends, weekend.id]);
                               } else {
-                                // Add date
-                                setSelectedUnavailableDates([...selectedUnavailableDates, currentDate]);
+                                setPreferredWeekends(preferredWeekends.filter(id => id !== weekend.id));
                               }
                             }}
-                            className={`
-                              aspect-square p-1 text-sm border rounded-md transition-all relative
-                              ${isSelected 
-                                ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' 
-                                : isHolidayDate
-                                  ? 'bg-accent/10 border-accent text-accent hover:bg-accent/20 font-semibold'
-                                  : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'
-                              }
-                              ${!canEdit ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
-                            `}
-                          >
-                            <div className="flex flex-col items-center justify-center h-full">
-                              <span className="font-medium">{format(currentDate, 'd')}</span>
-                              <span className="text-xs opacity-75">{format(currentDate, 'MMM')}</span>
-                              {isHolidayDate && (
-                                <Star className="h-2 w-2 absolute top-1 right-1" />
-                              )}
-                            </div>
-                          </button>
-                        );
-                      }
-                    }
-                    
-                    return dates;
-                  })()}
-                </div>
-
-                {/* Legend */}
-                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mt-4 pt-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-destructive border rounded"></div>
-                    <span>Unavailable</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-accent/10 border-accent border rounded relative">
-                      <Star className="h-2 w-2 absolute top-0.5 right-0.5 text-accent" />
+                            disabled={!canEdit}
+                          />
+                          <Label htmlFor={`weekend-${weekend.id}`} className="flex-1 cursor-pointer">
+                            <div className="font-medium">{weekend.label}</div>
+                            <div className="text-sm text-muted-foreground">{weekend.dates}</div>
+                          </Label>
+                        </div>
+                      ))}
                     </div>
-                    <span>Holiday</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-background border rounded"></div>
-                    <span>Available</span>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               </div>
-              {selectedUnavailableDates.length > 0 && (
-                <div className="mt-4">
-                  <Label className="text-sm font-medium">Selected Unavailable Dates:</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedUnavailableDates.map((date) => (
-                      <Badge key={date.toISOString()} variant="secondary">
-                        {format(date, 'MMM d, yyyy')}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+
+              {/* Notes */}
+              <Card className="shadow-soft">
+                <CardHeader>
+                  <CardTitle>Additional Notes</CardTitle>
+                  <CardDescription>
+                    Any additional information or special requests (optional)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    placeholder="Enter any additional notes or special requests..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="min-h-[100px]"
+                    disabled={!canEdit}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Submission Status */}
+              {isSubmitted && canEdit && (
+                <Alert>
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Preferences Submitted:</strong> Your call preferences have been submitted successfully. 
+                    You can still modify your submission until the block is closed for scheduling.
+                  </AlertDescription>
+                </Alert>
               )}
-            </CardContent>
-          </Card>
 
-          {/* Weekend Preferences */}
-          <Card className="shadow-soft">
-            <CardHeader>
-              <CardTitle>Weekend Preferences</CardTitle>
-              <CardDescription>
-                Select your preferred weekend(s) for call duties (Friday-Sunday blocks)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {weekends.map((weekend) => (
-                  <div key={weekend.id} className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                    <Checkbox
-                      id={`weekend-${weekend.id}`}
-                      checked={preferredWeekends.includes(weekend.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setPreferredWeekends([...preferredWeekends, weekend.id]);
-                        } else {
-                          setPreferredWeekends(preferredWeekends.filter(id => id !== weekend.id));
-                        }
-                      }}
-                      disabled={!canEdit}
-                    />
-                    <Label htmlFor={`weekend-${weekend.id}`} className="flex-1 cursor-pointer">
-                      <div className="font-medium">{weekend.label}</div>
-                      <div className="text-sm text-muted-foreground">{weekend.dates}</div>
-                    </Label>
-                  </div>
-                ))}
+              {isSubmitted && !canEdit && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Block Closed:</strong> This call block has been closed for scheduling. 
+                    Your preferences are locked and cannot be modified.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {!isSubmitted && !canEdit && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Block Closed:</strong> This call block has been closed. 
+                    New submissions are no longer accepted.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-4">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  onClick={handleSaveDraft}
+                  disabled={!canEdit || saving}
+                  className="flex-1 md:flex-none"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? "Saving..." : "Save Draft"}
+                </Button>
+                <Button 
+                  size="lg" 
+                  onClick={handleSubmit}
+                  disabled={!canEdit || saving}
+                  className="flex-1 md:flex-none bg-gradient-primary hover:opacity-90"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {saving ? "Submitting..." : (isSubmitted ? "Update Submission" : "Submit Preferences")}
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </TabsContent>
 
-        {/* Notes */}
-        <Card className="mt-6 shadow-soft">
-          <CardHeader>
-            <CardTitle>Additional Notes</CardTitle>
-            <CardDescription>
-              Any additional information or special requests (optional)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              placeholder="Enter any additional notes or special requests..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="min-h-[100px]"
-              disabled={!canEdit}
-            />
-          </CardContent>
-        </Card>
+            {/* Schedule Tab */}
+            <TabsContent value="schedule" className="space-y-6">
+              <Card className="shadow-soft">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarIcon className="h-5 w-5" />
+                    Call Schedule Calendar
+                  </CardTitle>
+                  <CardDescription>
+                    View the final call schedule populated from Google Calendars
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {/* Calendar Header */}
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold">
+                      {format(currentMonth, 'MMMM yyyy')}
+                    </h3>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentMonth(new Date())}
+                      >
+                        Today
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
 
-        {/* Submission Status */}
-        {isSubmitted && canEdit && (
-          <Alert className="mt-6">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Preferences Submitted:</strong> Your call preferences have been submitted successfully. 
-              You can still modify your submission until the block is closed for scheduling.
-            </AlertDescription>
-          </Alert>
-        )}
+                  {/* Calendar Grid */}
+                  <div className="space-y-2">
+                    {/* Day Headers */}
+                    <div className="grid grid-cols-7 gap-1 mb-2">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                        <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
 
-        {isSubmitted && !canEdit && (
-          <Alert className="mt-6">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Block Closed:</strong> This call block has been closed for scheduling. 
-              Your preferences are locked and cannot be modified.
-            </AlertDescription>
-          </Alert>
-        )}
+                    {/* Calendar Days */}
+                    <div className="grid grid-cols-7 gap-1">
+                      {(() => {
+                        const monthStart = startOfMonth(currentMonth);
+                        const monthEnd = endOfMonth(currentMonth);
+                        const startDate = new Date(monthStart);
+                        startDate.setDate(startDate.getDate() - monthStart.getDay()); // Start from Sunday
+                        
+                        const endDate = new Date(monthEnd);
+                        endDate.setDate(endDate.getDate() + (6 - monthEnd.getDay())); // End on Saturday
+                        
+                        const days = eachDayOfInterval({ start: startDate, end: endDate });
+                        
+                        return days.map((day) => {
+                          const isCurrentMonth = isSameMonth(day, currentMonth);
+                          const isCurrentDay = isToday(day);
+                          const dayEvents = calendarEvents.filter(event => 
+                            isSameDay(new Date(event.date), day)
+                          );
+                          
+                          return (
+                            <div
+                              key={day.toString()}
+                              className={`
+                                min-h-[80px] p-2 border rounded-md
+                                ${isCurrentMonth ? 'bg-background' : 'bg-muted/30 text-muted-foreground'}
+                                ${isCurrentDay ? 'ring-2 ring-primary' : ''}
+                              `}
+                            >
+                              <div className="text-sm font-medium mb-1">
+                                {format(day, 'd')}
+                              </div>
+                              <div className="space-y-1">
+                                {dayEvents.map((event, idx) => (
+                                  <div
+                                    key={idx}
+                                    className={`
+                                      text-xs p-1 rounded text-center
+                                      ${event.isUserEvent 
+                                        ? 'bg-primary text-primary-foreground' 
+                                        : 'bg-accent text-accent-foreground'
+                                      }
+                                    `}
+                                  >
+                                    {event.title}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
 
-        {!isSubmitted && !canEdit && (
-          <Alert variant="destructive" className="mt-6">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Block Closed:</strong> This call block has been closed. 
-              New submissions are no longer accepted.
-            </AlertDescription>
-          </Alert>
-        )}
+                  {/* Calendar Legend */}
+                  <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-primary rounded"></div>
+                      <span>Your Call Duties</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-accent rounded"></div>
+                      <span>Other Assignments</span>
+                    </div>
+                  </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-4 mt-8">
-          <Button 
-            variant="outline" 
-            size="lg" 
-            onClick={handleSaveDraft}
-            disabled={!canEdit || saving}
-            className="flex-1 md:flex-none"
-          >
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? "Saving..." : "Save Draft"}
-          </Button>
-          <Button 
-            size="lg" 
-            onClick={handleSubmit}
-            disabled={!canEdit || saving}
-            className="flex-1 md:flex-none bg-gradient-primary hover:opacity-90"
-          >
-            <Send className="h-4 w-4 mr-2" />
-            {saving ? "Submitting..." : (isSubmitted ? "Update Submission" : "Submit Preferences")}
-          </Button>
-        </div>
+                  {/* Setup Instructions */}
+                  <Alert className="mt-6">
+                    <CalendarIcon className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Google Calendar Integration:</strong> To populate this calendar with your call schedules, 
+                      we'll need to set up Google Calendar API access. This will allow you to see events from 2 different calendars.
+                    </AlertDescription>
+                  </Alert>
+
+                  {calendarLoading && (
+                    <div className="text-center py-8">
+                      <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                      <p className="text-sm text-muted-foreground">Loading calendar events...</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </ProtectedRoute>
