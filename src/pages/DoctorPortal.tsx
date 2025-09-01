@@ -745,18 +745,18 @@ const DoctorPortal = () => {
                           
                           const getEventColor = (calendarId: string, isUserEvent: boolean) => {
                             if (isUserEvent) {
-                              // User's events - use blue tones
+                              // User's events - use distinct color families
                               if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
-                                return "bg-blue-500 text-white";
+                                return "bg-blue-600 text-white"; // Blue for calendar 1
                               } else {
-                                return "bg-indigo-500 text-white";
+                                return "bg-purple-600 text-white"; // Purple for calendar 2
                               }
                             } else {
-                              // Other events - use green tones  
+                              // Other events - use complementary distinct colors
                               if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
-                                return "bg-teal-400 text-white";
+                                return "bg-orange-500 text-white"; // Orange for calendar 1
                               } else {
-                                return "bg-emerald-400 text-white";
+                                return "bg-pink-500 text-white"; // Pink for calendar 2
                               }
                             }
                           };
