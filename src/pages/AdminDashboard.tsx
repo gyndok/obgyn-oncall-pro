@@ -255,16 +255,24 @@ const AdminDashboard = () => {
 
   // Calculate submission stats
   const submissionStats = React.useMemo(() => {
+    if (!doctors.length || !Array.isArray(doctorRequests)) {
+      return { submittedCount: 0, inProgressCount: 0, notStartedCount: 0, progressPercent: 0 };
+    }
+
     const submittedCount = doctorRequests.filter(req => req.status === 'submitted').length;
     const inProgressCount = doctorRequests.filter(req => req.status === 'in_progress').length;
     const notStartedCount = doctors.length - doctorRequests.length;
-    const progressPercent = (submittedCount / doctors.length) * 100;
+    const progressPercent = doctors.length > 0 ? (submittedCount / doctors.length) * 100 : 0;
 
     return { submittedCount, inProgressCount, notStartedCount, progressPercent };
   }, [doctorRequests, doctors]);
 
   // Create doctor status list
   const doctorStatuses = React.useMemo(() => {
+    if (!Array.isArray(doctors) || !Array.isArray(doctorRequests)) {
+      return [];
+    }
+
     return doctors.map(doctor => {
       const request = doctorRequests.find(req => req.doctors?.email === doctor.email);
       return {
