@@ -815,7 +815,7 @@ const DoctorPortal = () => {
                                  {dayEvents.map((event, idx) => (
                                    <div
                                      key={idx}
-                                     className={`text-xs p-1 rounded text-center ${getEventColor(event.calendarId, event.isUserEvent, event.title, doctorRecord?.name || '', (event as any).isHoliday)}`}
+                                     className={`text-[10px] p-0.5 rounded text-center leading-tight ${getEventColor(event.calendarId, event.isUserEvent, event.title, doctorRecord?.name || '', (event as any).isHoliday)}`}
                                      title={`${event.title} - ${event.calendarId.includes('odn75bvuc02onjrb0ai9oskbc4') ? 'Calendar 1' : 'Calendar 2'}`}
                                    >
                                      {event.title}
