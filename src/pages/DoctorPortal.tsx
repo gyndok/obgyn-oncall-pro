@@ -815,35 +815,7 @@ const DoctorPortal = () => {
                     </div>
                   </div>
 
-                   {/* Calendar Legend */}
-                   <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t text-sm">
-                     <div className="flex items-center gap-2">
-                       <div className="w-4 h-4 bg-green-600 border border-green-800 rounded"></div>
-                       <span>Your Call Duties (Calendar 1)</span>
-                     </div>
-                     <div className="flex items-center gap-2">
-                       <div className="w-4 h-4 bg-red-600 border border-red-800 rounded"></div>
-                       <span>Your Call Duties (Calendar 2)</span>
-                     </div>
-                     <div className="flex items-center gap-2">
-                       <div className="w-4 h-4 bg-blue-600 rounded"></div>
-                       <span>Other User Events (Calendar 1)</span>
-                     </div>
-                     <div className="flex items-center gap-2">
-                       <div className="w-4 h-4 bg-purple-600 rounded"></div>
-                       <span>Other User Events (Calendar 2)</span>
-                     </div>
-                     <div className="flex items-center gap-2">
-                       <div className="w-4 h-4 bg-orange-500 rounded"></div>
-                       <span>General Events (Calendar 1)</span>
-                     </div>
-                     <div className="flex items-center gap-2">
-                       <div className="w-4 h-4 bg-pink-500 rounded"></div>
-                       <span>General Events (Calendar 2)</span>
-                     </div>
-                   </div>
-
-                  {/* Setup Instructions */}
+                   {/* Setup Instructions */}
                   <Alert className="mt-6">
                     <CalendarIcon className="h-4 w-4" />
                     <AlertDescription>
