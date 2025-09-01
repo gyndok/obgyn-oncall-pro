@@ -85,7 +85,7 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     try {
-      // Fetch blocks
+      // Fetch blocks (but prioritize active 'collecting' blocks)
       const { data: blocksData, error: blocksError } = await supabase
         .from('blocks')
         .select('*')
@@ -94,7 +94,7 @@ const AdminDashboard = () => {
       if (blocksError) throw blocksError;
       setBlocks(blocksData || []);
 
-      // Get current active block
+      // Get current active block (prefer 'collecting' status, otherwise most recent)
       const activeBlock = blocksData?.find(block => block.status === 'collecting') || blocksData?.[0];
       setCurrentBlock(activeBlock);
 
@@ -108,26 +108,26 @@ const AdminDashboard = () => {
       setDoctors(doctorsData || []);
 
       if (activeBlock) {
-        // Fetch doctor requests for current block
+        // Fetch doctor requests for CURRENT active block only (not old completed blocks)
         const { data: requestsData, error: requestsError } = await supabase
           .from('doctor_requests')
           .select(`
             *,
             doctors (name, email)
           `)
-          .eq('block_id', activeBlock.id);
+          .eq('block_id', activeBlock.id); // CRITICAL: Only current block data
 
         if (requestsError) throw requestsError;
         setDoctorRequests(requestsData || []);
 
-        // Fetch assignments for current block
+        // Fetch assignments for CURRENT block only (not old published schedules)
         const { data: assignmentsData, error: assignmentsError } = await supabase
           .from('assignments')
           .select(`
             *,
             doctors (name, email)
           `)
-          .eq('block_id', activeBlock.id);
+          .eq('block_id', activeBlock.id); // CRITICAL: Only current block assignments
 
         if (assignmentsError) throw assignmentsError;
         setAssignments(assignmentsData || []);

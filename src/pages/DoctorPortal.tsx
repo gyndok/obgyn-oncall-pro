@@ -168,7 +168,7 @@ const DoctorPortal = () => {
 
         setDoctorRecord(doctor);
 
-        // Get current active block
+        // Get current active block (only show current, not old completed ones)
         const { data: blocks, error: blockError } = await supabase
           .from('blocks')
           .select('*')
@@ -212,7 +212,7 @@ const DoctorPortal = () => {
 
           if (requestError) throw requestError;
 
-          // Fetch all doctors and their requests for team status
+          // Fetch all doctors and their requests for team status (ONLY for current block)
           const { data: allDoctorsData, error: allDoctorsError } = await supabase
             .from('doctors')
             .select('*')
@@ -225,7 +225,7 @@ const DoctorPortal = () => {
           const { data: allRequestsData, error: allRequestsError } = await supabase
             .from('doctor_requests')
             .select('*, doctors(name, email)')
-            .eq('block_id', block.id);
+            .eq('block_id', block.id); // CRITICAL: Only get requests for current block
 
           if (allRequestsError) throw allRequestsError;
           setAllDoctorRequests(allRequestsData || []);
