@@ -88,8 +88,9 @@ const handler = async (req: Request): Promise<Response> => {
             );
 
             // For multi-day events, create an entry for each day
-            const start = new Date(startDate);
-            const end = new Date(endDate);
+            // Handle timezone properly for date-only events
+            const start = event.start?.date ? new Date(startDate + 'T00:00:00-05:00') : new Date(startDate);
+            const end = event.end?.date ? new Date(endDate + 'T00:00:00-05:00') : new Date(endDate);
             const events = [];
             
             // If it's a multi-day event (end date is different from start date)
@@ -97,12 +98,16 @@ const handler = async (req: Request): Promise<Response> => {
               // Create an event for each day in the range
               const currentDate = new Date(start);
               while (currentDate < end) {
+                // Format date in Central timezone
+                const centralDate = new Date(currentDate.getTime() - (currentDate.getTimezoneOffset() * 60000));
+                const dateStr = centralDate.toISOString().split('T')[0];
+                
                 events.push({
-                  id: `${event.id}_${currentDate.toISOString().split('T')[0]}`,
+                  id: `${event.id}_${dateStr}`,
                   title: event.summary || 'Untitled Event',
                   description: event.description || '',
-                  date: currentDate.toISOString().split('T')[0],
-                  endDate: currentDate.toISOString().split('T')[0],
+                  date: dateStr,
+                  endDate: dateStr,
                   isAllDay: true,
                   calendarId: calendarId,
                   isUserEvent: isUserEvent,
@@ -121,12 +126,17 @@ const handler = async (req: Request): Promise<Response> => {
               }
             } else {
               // Single day event
+              const eventDate = event.start?.date ? 
+                new Date(startDate + 'T00:00:00-05:00') : 
+                new Date(startDate);
+              const eventDateStr = event.start?.date ? startDate : eventDate.toISOString().split('T')[0];
+              
               events.push({
                 id: event.id,
                 title: event.summary || 'Untitled Event',
                 description: event.description || '',
-                date: startDate,
-                endDate: endDate,
+                date: eventDateStr,
+                endDate: event.end?.date ? endDate : eventDate.toISOString().split('T')[0],
                 isAllDay: !event.start?.dateTime,
                 calendarId: calendarId,
                 isUserEvent: isUserEvent,
@@ -134,7 +144,7 @@ const handler = async (req: Request): Promise<Response> => {
                 attendees: event.attendees || [],
                 created: event.created,
                 updated: event.updated,
-                dayOfWeek: new Date(startDate).getDay(),
+                dayOfWeek: eventDate.getDay(),
                 rawEvent: {
                   start: event.start,
                   end: event.end,
