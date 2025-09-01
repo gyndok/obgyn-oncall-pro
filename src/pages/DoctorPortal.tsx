@@ -741,6 +741,19 @@ const DoctorPortal = () => {
                             const eventDateStr = event.date.split('T')[0]; // Get YYYY-MM-DD part
                             const dayDateStr = format(day, 'yyyy-MM-dd');
                             return eventDateStr === dayDateStr;
+                          }).sort((a, b) => {
+                            // Sort by priority: Call events first, then Out events
+                            const aIsCall = a.title.toLowerCase().includes('call');
+                            const bIsCall = b.title.toLowerCase().includes('call');
+                            const aIsOut = a.title.toLowerCase().includes('out');
+                            const bIsOut = b.title.toLowerCase().includes('out');
+                            
+                            // Call events come first
+                            if (aIsCall && !bIsCall) return -1;
+                            if (!aIsCall && bIsCall) return 1;
+                            
+                            // Within same type, sort alphabetically
+                            return a.title.localeCompare(b.title);
                           });
                           
                           const getEventColor = (calendarId: string, isUserEvent: boolean, eventTitle: string, doctorName: string) => {
