@@ -38,6 +38,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, addWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
 
+// Helper function to parse date-only strings as local dates (avoiding UTC timezone issues)
+const parseLocalDate = (dateString: string) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day); // month is 0-indexed
+};
+
 const AdminDashboard = () => {
   const [blocks, setBlocks] = useState<any[]>([]);
   const [currentBlock, setCurrentBlock] = useState<any>(null);
@@ -204,7 +210,7 @@ const AdminDashboard = () => {
     setSaving(true);
     try {
       // Simple schedule generation algorithm
-      const blockStart = new Date(currentBlock.start_monday_date);
+      const blockStart = parseLocalDate(currentBlock.start_monday_date);
       const assignments = [];
       const availableDoctors = [...doctors];
 
@@ -265,8 +271,8 @@ const AdminDashboard = () => {
 
   const startEditingDates = () => {
     if (currentBlock) {
-      setEditStartDate(new Date(currentBlock.start_monday_date));
-      setEditEndDate(new Date(currentBlock.end_sunday_date));
+      setEditStartDate(parseLocalDate(currentBlock.start_monday_date));
+      setEditEndDate(parseLocalDate(currentBlock.end_sunday_date));
       setIsEditingDates(true);
     }
   };
@@ -619,7 +625,7 @@ const AdminDashboard = () => {
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Start Date</Label>
                       {!isEditingDates ? (
-                        <p className="text-lg font-semibold">{format(new Date(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
+                        <p className="text-lg font-semibold">{format(parseLocalDate(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
                       ) : (
                         <Popover>
                           <PopoverTrigger asChild>
@@ -649,7 +655,7 @@ const AdminDashboard = () => {
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">End Date</Label>
                       {!isEditingDates ? (
-                        <p className="text-lg font-semibold">{format(new Date(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
+                        <p className="text-lg font-semibold">{format(parseLocalDate(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
                       ) : (
                         <p className="text-lg font-semibold text-muted-foreground mt-1">
                           {editStartDate ? format(addDays(addWeeks(editStartDate, 7), -1), 'MMM d, yyyy') : 'Auto-calculated'}
