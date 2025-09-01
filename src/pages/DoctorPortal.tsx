@@ -25,6 +25,7 @@ const DoctorPortal = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [weekends, setWeekends] = useState<any[]>([]);
+  const [doctorRecord, setDoctorRecord] = useState<any>(null);
 
   // Fetch current block and doctor's existing request
   useEffect(() => {
@@ -32,6 +33,27 @@ const DoctorPortal = () => {
       if (!user) return;
 
       try {
+        // First, find the doctor record for this authenticated user
+        const { data: doctor, error: doctorError } = await supabase
+          .from('doctors')
+          .select('*')
+          .eq('email', user.email)
+          .maybeSingle();
+
+        if (doctorError) throw doctorError;
+
+        if (!doctor) {
+          toast({
+            title: "Access Denied",
+            description: "You are not registered as a doctor in the system. Please contact your administrator.",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+
+        setDoctorRecord(doctor);
+
         // Get current active block
         const { data: blocks, error: blockError } = await supabase
           .from('blocks')
@@ -71,7 +93,7 @@ const DoctorPortal = () => {
             .from('doctor_requests')
             .select('*')
             .eq('block_id', block.id)
-            .eq('doctor_id', user.id)
+            .eq('doctor_id', doctor.id)
             .maybeSingle();
 
           if (requestError) throw requestError;
@@ -108,13 +130,13 @@ const DoctorPortal = () => {
   }, [user]);
 
   const handleSaveDraft = async () => {
-    if (!currentBlock || !user) return;
+    if (!currentBlock || !doctorRecord) return;
     
     setSaving(true);
     try {
       const requestData = {
         block_id: currentBlock.id,
-        doctor_id: user.id,
+        doctor_id: doctorRecord.id,
         unavailable_dates: selectedUnavailableDates.map(date => format(date, 'yyyy-MM-dd')),
         preferred_weekends: preferredWeekends,
         notes: notes,
@@ -160,13 +182,13 @@ const DoctorPortal = () => {
   };
 
   const handleSubmit = async () => {
-    if (!currentBlock || !user) return;
+    if (!currentBlock || !doctorRecord) return;
     
     setSaving(true);
     try {
       const requestData = {
         block_id: currentBlock.id,
-        doctor_id: user.id,
+        doctor_id: doctorRecord.id,
         unavailable_dates: selectedUnavailableDates.map(date => format(date, 'yyyy-MM-dd')),
         preferred_weekends: preferredWeekends,
         notes: notes,
