@@ -85,10 +85,10 @@ const DoctorPortal = () => {
 
     setCalendarLoading(true);
     try {
-      // You'll need to configure these calendar IDs
+      // Configure your actual calendar IDs
       const calendarIds = [
-        "primary", // User's primary calendar
-        "your-second-calendar-id@group.calendar.google.com" // Replace with actual calendar ID
+        "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com",
+        "q6u72r1ummu006qishq90i7iek@group.calendar.google.com"
       ];
 
       // Get date range for current month and surrounding months
