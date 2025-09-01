@@ -4,35 +4,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-
 const Index = () => {
-  const { user, signOut } = useAuth();
-
-  const features = [
-    {
-      icon: <Calendar className="h-6 w-6" />,
-      title: "Automated Scheduling",
-      description: "Generate compliant 7-week on-call schedules automatically following all medical guidelines."
-    },
-    {
-      icon: <Users className="h-6 w-6" />,
-      title: "Doctor Portal",
-      description: "Easy submission of time-off requests and weekend preferences with real-time status tracking."
-    },
-    {
-      icon: <Shield className="h-6 w-6" />,
-      title: "Constraint Compliance", 
-      description: "100% adherence to hard rules including weekend assignments and doctor-specific restrictions."
-    },
-    {
-      icon: <CheckCircle className="h-6 w-6" />,
-      title: "Google Calendar Sync",
-      description: "Seamless integration with Google Calendar for automatic schedule publishing and updates."
-    }
-  ];
-
-  return (
-    <div className="min-h-screen bg-background">
+  const {
+    user,
+    signOut
+  } = useAuth();
+  const features = [{
+    icon: <Calendar className="h-6 w-6" />,
+    title: "Automated Scheduling",
+    description: "Generate compliant 7-week on-call schedules automatically following all medical guidelines."
+  }, {
+    icon: <Users className="h-6 w-6" />,
+    title: "Doctor Portal",
+    description: "Easy submission of time-off requests and weekend preferences with real-time status tracking."
+  }, {
+    icon: <Shield className="h-6 w-6" />,
+    title: "Constraint Compliance",
+    description: "100% adherence to hard rules including weekend assignments and doctor-specific restrictions."
+  }, {
+    icon: <CheckCircle className="h-6 w-6" />,
+    title: "Google Calendar Sync",
+    description: "Seamless integration with Google Calendar for automatic schedule publishing and updates."
+  }];
+  return <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border/40 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -43,29 +37,20 @@ const Index = () => {
               </h1>
             </div>
             <div className="flex items-center gap-4">
-              {user ? (
-                <div className="flex items-center gap-4">
+              {user ? <div className="flex items-center gap-4">
                   <span className="text-sm text-muted-foreground">
                     Welcome, {user.email}
                   </span>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={signOut}
-                    className="flex items-center gap-2"
-                  >
+                  <Button variant="outline" size="sm" onClick={signOut} className="flex items-center gap-2">
                     <LogOut className="w-4 h-4" />
                     Sign Out
                   </Button>
-                </div>
-              ) : (
-                <Link to="/auth">
+                </div> : <Link to="/auth">
                   <Button variant="outline" size="sm" className="flex items-center gap-2">
                     <LogIn className="w-4 h-4" />
                     Sign In
                   </Button>
-                </Link>
-              )}
+                </Link>}
             </div>
           </div>
         </div>
@@ -83,14 +68,7 @@ const Index = () => {
           <p className="text-xl md:text-2xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed">
             Streamline your medical practice with intelligent, constraint-based scheduling that ensures fair coverage and compliance with all medical guidelines.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-white text-primary hover:bg-white/90 shadow-medium" asChild>
-              <Link to="/doctor">Doctor Portal</Link>
-            </Button>
-            <Button size="lg" variant="outline" className="border-primary-foreground/80 text-primary-foreground hover:bg-primary-foreground hover:text-primary backdrop-blur-sm bg-white/10" asChild>
-              <Link to="/admin">Admin Dashboard</Link>
-            </Button>
-          </div>
+          
         </div>
       </section>
 
@@ -107,8 +85,7 @@ const Index = () => {
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {features.map((feature, index) => (
-              <Card key={index} className="bg-gradient-card border-border shadow-soft hover:shadow-medium transition-all duration-300">
+            {features.map((feature, index) => <Card key={index} className="bg-gradient-card border-border shadow-soft hover:shadow-medium transition-all duration-300">
                 <CardHeader className="text-center pb-4">
                   <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-4">
                     {feature.icon}
@@ -120,8 +97,7 @@ const Index = () => {
                     {feature.description}
                   </CardDescription>
                 </CardContent>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </div>
       </section>
@@ -164,8 +140,6 @@ const Index = () => {
           </Button>
         </div>
       </section>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;
