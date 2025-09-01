@@ -743,6 +743,24 @@ const DoctorPortal = () => {
                             return eventDateStr === dayDateStr;
                           });
                           
+                          const getEventColor = (calendarId: string, isUserEvent: boolean) => {
+                            if (isUserEvent) {
+                              // User's events - use blue tones
+                              if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
+                                return "bg-blue-500 text-white";
+                              } else {
+                                return "bg-indigo-500 text-white";
+                              }
+                            } else {
+                              // Other events - use green tones  
+                              if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
+                                return "bg-teal-400 text-white";
+                              } else {
+                                return "bg-emerald-400 text-white";
+                              }
+                            }
+                          };
+
                           return (
                             <div
                               key={day.toString()}
@@ -756,20 +774,15 @@ const DoctorPortal = () => {
                                 {format(day, 'd')}
                               </div>
                               <div className="space-y-1">
-                                {dayEvents.map((event, idx) => (
-                                  <div
-                                    key={idx}
-                                    className={`
-                                      text-xs p-1 rounded text-center
-                                      ${event.isUserEvent 
-                                        ? 'bg-primary text-primary-foreground' 
-                                        : 'bg-accent text-accent-foreground'
-                                      }
-                                    `}
-                                  >
-                                    {event.title}
-                                  </div>
-                                ))}
+                                 {dayEvents.map((event, idx) => (
+                                   <div
+                                     key={idx}
+                                     className={`text-xs p-1 rounded text-center ${getEventColor(event.calendarId, event.isUserEvent)}`}
+                                     title={`${event.title} - ${event.calendarId.includes('odn75bvuc02onjrb0ai9oskbc4') ? 'Calendar 1' : 'Calendar 2'}`}
+                                   >
+                                     {event.title}
+                                   </div>
+                                 ))}
                               </div>
                             </div>
                           );
