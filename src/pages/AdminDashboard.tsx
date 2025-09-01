@@ -30,6 +30,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -78,6 +79,15 @@ const AdminDashboard = () => {
 
   // Expanded rows state
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  
+  // Edit request state
+  const [editingRequest, setEditingRequest] = useState<any>(null);
+  const [showEditRequestDialog, setShowEditRequestDialog] = useState(false);
+  const [editRequestForm, setEditRequestForm] = useState({
+    unavailable_dates: [] as Date[],
+    preferred_weekends: [] as number[],
+    notes: ""
+  });
 
   useEffect(() => {
     fetchData();
@@ -558,6 +568,96 @@ const AdminDashboard = () => {
     }).join(', ');
   };
 
+  // Edit request functions
+  const openEditRequestDialog = (doctor: any) => {
+    if (!doctor.request) {
+      toast({
+        title: "No Request Found",
+        description: "This doctor hasn't submitted a request yet.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setEditingRequest(doctor.request);
+    setEditRequestForm({
+      unavailable_dates: Array.isArray(doctor.request.unavailable_dates) 
+        ? doctor.request.unavailable_dates.map((date: string) => parseLocalDate(date))
+        : [],
+      preferred_weekends: Array.isArray(doctor.request.preferred_weekends) 
+        ? doctor.request.preferred_weekends 
+        : [],
+      notes: doctor.request.notes || ""
+    });
+    setShowEditRequestDialog(true);
+  };
+
+  const closeEditRequestDialog = () => {
+    setShowEditRequestDialog(false);
+    setEditingRequest(null);
+    setEditRequestForm({
+      unavailable_dates: [],
+      preferred_weekends: [],
+      notes: ""
+    });
+  };
+
+  const saveEditedRequest = async () => {
+    if (!editingRequest) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('doctor_requests')
+        .update({
+          unavailable_dates: editRequestForm.unavailable_dates.map(date => format(date, 'yyyy-MM-dd')),
+          preferred_weekends: editRequestForm.preferred_weekends,
+          notes: editRequestForm.notes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingRequest.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Request Updated",
+        description: "Doctor's request has been updated successfully.",
+      });
+
+      closeEditRequestDialog();
+      fetchData(); // Refresh data
+    } catch (error) {
+      console.error('Error updating request:', error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update the request. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeUnavailableDate = (dateToRemove: Date) => {
+    setEditRequestForm({
+      ...editRequestForm,
+      unavailable_dates: editRequestForm.unavailable_dates.filter(date => 
+        format(date, 'yyyy-MM-dd') !== format(dateToRemove, 'yyyy-MM-dd')
+      )
+    });
+  };
+
+  const addUnavailableDate = (date: Date | undefined) => {
+    if (date && !editRequestForm.unavailable_dates.some(existingDate => 
+      format(existingDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+    )) {
+      setEditRequestForm({
+        ...editRequestForm,
+        unavailable_dates: [...editRequestForm.unavailable_dates, date]
+      });
+    }
+  };
+
   if (loading) {
     return (
       <ProtectedRoute requireAdmin={true}>
@@ -772,29 +872,39 @@ const AdminDashboard = () => {
                                <TableCell>{doctor.submittedAt || '-'}</TableCell>
                              </TableRow>
                              {expandedRows.has(doctor.email) && doctor.request && (
-                               <TableRow>
-                                 <TableCell colSpan={5} className="bg-muted/30 p-6">
-                                   <div className="space-y-4">
-                                     <h4 className="font-semibold text-sm">Request Details</h4>
-                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                       <div>
-                                         <Label className="font-medium text-muted-foreground">Unavailable Dates</Label>
-                                         <p className="mt-1">{formatDateList(doctor.request.unavailable_dates)}</p>
-                                       </div>
+                                <TableRow>
+                                  <TableCell colSpan={5} className="bg-muted/30 p-6">
+                                    <div className="space-y-4">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="font-semibold text-sm">Request Details</h4>
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm"
+                                          onClick={() => openEditRequestDialog(doctor)}
+                                        >
+                                          <Edit className="h-3 w-3 mr-1" />
+                                          Edit Request
+                                        </Button>
+                                      </div>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                         <div>
-                                          <Label className="font-medium text-muted-foreground">Preferred Weekends</Label>
-                                          <p className="mt-1">{formatPreferredWeekends(doctor.request.preferred_weekends)}</p>
+                                          <Label className="font-medium text-muted-foreground">Unavailable Dates</Label>
+                                          <p className="mt-1">{formatDateList(doctor.request.unavailable_dates)}</p>
                                         </div>
-                                       {doctor.request.notes && (
-                                         <div className="md:col-span-2">
-                                           <Label className="font-medium text-muted-foreground">Notes</Label>
-                                           <p className="mt-1 text-muted-foreground">{doctor.request.notes}</p>
+                                         <div>
+                                           <Label className="font-medium text-muted-foreground">Preferred Weekends</Label>
+                                           <p className="mt-1">{formatPreferredWeekends(doctor.request.preferred_weekends)}</p>
                                          </div>
-                                       )}
-                                     </div>
-                                   </div>
-                                 </TableCell>
-                               </TableRow>
+                                        {doctor.request.notes && (
+                                          <div className="md:col-span-2">
+                                            <Label className="font-medium text-muted-foreground">Notes</Label>
+                                            <p className="mt-1 text-muted-foreground">{doctor.request.notes}</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
                              )}
                            </React.Fragment>
                          ))}
@@ -1175,6 +1285,134 @@ const AdminDashboard = () => {
         </Tabs>
       </div>
       </div>
+
+      {/* Edit Request Dialog */}
+      <Dialog open={showEditRequestDialog} onOpenChange={setShowEditRequestDialog}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Doctor Request</DialogTitle>
+            <DialogDescription>
+              Manually edit unavailable dates and preferences for this doctor
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* Unavailable Dates Section */}
+            <div>
+              <Label className="text-base font-medium">Unavailable Dates</Label>
+              <div className="space-y-3 mt-2">
+                {/* Current unavailable dates */}
+                <div className="flex flex-wrap gap-2">
+                  {editRequestForm.unavailable_dates.map((date, index) => (
+                    <Badge key={index} variant="outline" className="px-2 py-1">
+                      {format(date, 'MMM d, yyyy')}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-4 w-4 p-0 ml-2 hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() => removeUnavailableDate(date)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                  {editRequestForm.unavailable_dates.length === 0 && (
+                    <span className="text-muted-foreground text-sm">No unavailable dates</span>
+                  )}
+                </div>
+                
+                {/* Add new date */}
+                <div>
+                  <Label className="text-sm text-muted-foreground">Add Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal mt-1"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        Add unavailable date
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        onSelect={addUnavailableDate}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            </div>
+
+            {/* Preferred Weekends Section */}
+            <div>
+              <Label className="text-base font-medium">Preferred Weekends</Label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {[1, 2, 3, 4, 5, 6, 7].map((weekNum) => {
+                  const isSelected = editRequestForm.preferred_weekends.includes(weekNum);
+                  const weekEndDates = currentBlock ? (() => {
+                    const startDate = parseLocalDate(currentBlock.start_monday_date);
+                    const fridayOfWeek = addDays(startDate, (weekNum - 1) * 7 + 4);
+                    const sundayOfWeek = addDays(fridayOfWeek, 2);
+                    return `${format(fridayOfWeek, 'MMM d')}-${format(sundayOfWeek, 'd')}`;
+                  })() : '';
+
+                  return (
+                    <div
+                      key={weekNum}
+                      className={cn(
+                        "p-2 border rounded cursor-pointer transition-colors",
+                        isSelected 
+                          ? "border-primary bg-primary/10 text-primary" 
+                          : "border-border hover:border-primary/50"
+                      )}
+                      onClick={() => {
+                        if (isSelected) {
+                          setEditRequestForm({
+                            ...editRequestForm,
+                            preferred_weekends: editRequestForm.preferred_weekends.filter(w => w !== weekNum)
+                          });
+                        } else {
+                          setEditRequestForm({
+                            ...editRequestForm,
+                            preferred_weekends: [...editRequestForm.preferred_weekends, weekNum]
+                          });
+                        }
+                      }}
+                    >
+                      <div className="text-sm font-medium">Week {weekNum}</div>
+                      <div className="text-xs text-muted-foreground">{weekEndDates}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Notes Section */}
+            <div>
+              <Label htmlFor="request-notes" className="text-base font-medium">Notes</Label>
+              <Textarea
+                id="request-notes"
+                value={editRequestForm.notes}
+                onChange={(e) => setEditRequestForm({...editRequestForm, notes: e.target.value})}
+                placeholder="Additional notes or special requests..."
+                className="mt-2"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeEditRequestDialog}>
+              Cancel
+            </Button>
+            <Button onClick={saveEditedRequest} disabled={saving}>
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ProtectedRoute>
   );
 };
