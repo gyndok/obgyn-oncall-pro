@@ -79,6 +79,64 @@ const DoctorPortal = () => {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
+  // Fetch calendar events
+  const fetchCalendarEvents = async () => {
+    if (!user?.email) return;
+
+    setCalendarLoading(true);
+    try {
+      // You'll need to configure these calendar IDs
+      const calendarIds = [
+        "primary", // User's primary calendar
+        "your-second-calendar-id@group.calendar.google.com" // Replace with actual calendar ID
+      ];
+
+      // Get date range for current month and surrounding months
+      const startOfCurrentMonth = startOfMonth(currentMonth);
+      const endOfCurrentMonth = endOfMonth(currentMonth);
+      const timeMin = new Date(startOfCurrentMonth);
+      timeMin.setMonth(timeMin.getMonth() - 1);
+      const timeMax = new Date(endOfCurrentMonth);
+      timeMax.setMonth(timeMax.getMonth() + 1);
+
+      const { data, error } = await supabase.functions.invoke('fetch-calendar-events', {
+        body: {
+          calendarIds,
+          timeMin: timeMin.toISOString(),
+          timeMax: timeMax.toISOString(),
+          userEmail: user.email
+        }
+      });
+
+      if (error) {
+        console.error('Error fetching calendar events:', error);
+        toast({
+          title: "Calendar Error",
+          description: "Failed to load calendar events. Please check your calendar configuration.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setCalendarEvents(data.events || []);
+      console.log(`Loaded ${data.events?.length || 0} calendar events`);
+    } catch (error) {
+      console.error('Error fetching calendar events:', error);
+      toast({
+        title: "Calendar Error",
+        description: "Failed to load calendar events.",
+        variant: "destructive"
+      });
+    } finally {
+      setCalendarLoading(false);
+    }
+  };
+
+  // Fetch calendar events when month changes
+  useEffect(() => {
+    fetchCalendarEvents();
+  }, [currentMonth, user?.email]);
+
   // Fetch current block and doctor's existing request
   useEffect(() => {
     const fetchData = async () => {
@@ -733,8 +791,12 @@ const DoctorPortal = () => {
                   <Alert className="mt-6">
                     <CalendarIcon className="h-4 w-4" />
                     <AlertDescription>
-                      <strong>Google Calendar Integration:</strong> To populate this calendar with your call schedules, 
-                      we'll need to set up Google Calendar API access. This will allow you to see events from 2 different calendars.
+                      <strong>Google Calendar Integration:</strong> This calendar displays events from 2 Google Calendars. 
+                      To configure, update the calendar IDs in the code with your actual Google Calendar IDs.
+                      <br /><br />
+                      <Button variant="outline" size="sm" onClick={fetchCalendarEvents} className="mt-2">
+                        Refresh Calendar
+                      </Button>
                     </AlertDescription>
                   </Alert>
 
