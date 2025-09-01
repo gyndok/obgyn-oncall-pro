@@ -204,6 +204,7 @@ export type Database = {
       }
       doctors: {
         Row: {
+          account_setup_completed: boolean | null
           active: boolean
           auth_user_id: string | null
           created_at: string
@@ -215,6 +216,7 @@ export type Database = {
           name: string
         }
         Insert: {
+          account_setup_completed?: boolean | null
           active?: boolean
           auth_user_id?: string | null
           created_at?: string
@@ -226,6 +228,7 @@ export type Database = {
           name: string
         }
         Update: {
+          account_setup_completed?: boolean | null
           active?: boolean
           auth_user_id?: string | null
           created_at?: string

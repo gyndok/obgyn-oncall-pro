@@ -26,9 +26,10 @@ export const useFirstLoginTracker = () => {
         if (doctor && !doctor.first_login_at) {
           const { error: updateError } = await supabase
             .from('doctors')
-            .update({
+            .update({ 
               first_login_at: new Date().toISOString(),
-              auth_user_id: user.id
+              auth_user_id: user.id,
+              account_setup_completed: true
             })
             .eq('id', doctor.id);
 
