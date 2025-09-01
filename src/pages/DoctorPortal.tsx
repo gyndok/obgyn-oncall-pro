@@ -27,43 +27,63 @@ const parseLocalDate = (dateString: string) => {
 // Holiday detection function
 const getHolidays = (year: number) => {
   const holidays = [];
-  
+
   // Fixed holidays
-  holidays.push({ date: new Date(year, 0, 1), name: "New Year's Day" });
-  holidays.push({ date: new Date(year, 6, 4), name: "Independence Day" });
-  holidays.push({ date: new Date(year, 10, 11), name: "Veterans Day" });
-  holidays.push({ date: new Date(year, 11, 25), name: "Christmas Day" });
-  
+  holidays.push({
+    date: new Date(year, 0, 1),
+    name: "New Year's Day"
+  });
+  holidays.push({
+    date: new Date(year, 6, 4),
+    name: "Independence Day"
+  });
+  holidays.push({
+    date: new Date(year, 10, 11),
+    name: "Veterans Day"
+  });
+  holidays.push({
+    date: new Date(year, 11, 25),
+    name: "Christmas Day"
+  });
+
   // Memorial Day (last Monday in May)
   const memorialDay = new Date(year, 4, 31);
   memorialDay.setDate(31 - memorialDay.getDay());
-  holidays.push({ date: memorialDay, name: "Memorial Day" });
-  
+  holidays.push({
+    date: memorialDay,
+    name: "Memorial Day"
+  });
+
   // Labor Day (first Monday in September)
   const laborDay = new Date(year, 8, 1);
   laborDay.setDate(1 + (7 - laborDay.getDay()) % 7);
-  holidays.push({ date: laborDay, name: "Labor Day" });
-  
+  holidays.push({
+    date: laborDay,
+    name: "Labor Day"
+  });
+
   // Thanksgiving (fourth Thursday in November)
   const thanksgiving = new Date(year, 10, 1);
   thanksgiving.setDate(1 + (4 - thanksgiving.getDay() + 7) % 7 + 21);
-  holidays.push({ date: thanksgiving, name: "Thanksgiving" });
-  
+  holidays.push({
+    date: thanksgiving,
+    name: "Thanksgiving"
+  });
   return holidays;
 };
-
 const getHolidayInfo = (date: Date) => {
   const year = getYear(date);
   const holidays = getHolidays(year);
   return holidays.find(holiday => isSameDay(holiday.date, date));
 };
-
 const isHoliday = (date: Date) => {
   return !!getHolidayInfo(date);
 };
-
 const DoctorPortal = () => {
-  const { user, isAdmin } = useAuth();
+  const {
+    user,
+    isAdmin
+  } = useAuth();
   const navigate = useNavigate();
   const [selectedUnavailableDates, setSelectedUnavailableDates] = useState<Date[]>([]);
   const [preferredWeekends, setPreferredWeekends] = useState<number[]>([]);
@@ -86,14 +106,10 @@ const DoctorPortal = () => {
   // Fetch calendar events
   const fetchCalendarEvents = async () => {
     if (!user?.email) return;
-
     setCalendarLoading(true);
     try {
       // Configure your actual calendar IDs
-      const calendarIds = [
-        "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com",
-        "q6u72r1ummu006qishq90i7iek@group.calendar.google.com"
-      ];
+      const calendarIds = ["odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com", "q6u72r1ummu006qishq90i7iek@group.calendar.google.com"];
 
       // Get date range for current month and surrounding months
       const startOfCurrentMonth = startOfMonth(currentMonth);
@@ -102,8 +118,10 @@ const DoctorPortal = () => {
       timeMin.setMonth(timeMin.getMonth() - 1);
       const timeMax = new Date(endOfCurrentMonth);
       timeMax.setMonth(timeMax.getMonth() + 1);
-
-      const { data, error } = await supabase.functions.invoke('fetch-calendar-events', {
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('fetch-calendar-events', {
         body: {
           calendarIds,
           timeMin: timeMin.toISOString(),
@@ -111,7 +129,6 @@ const DoctorPortal = () => {
           userEmail: user.email
         }
       });
-
       if (error) {
         console.error('Error fetching calendar events:', error);
         toast({
@@ -121,7 +138,6 @@ const DoctorPortal = () => {
         });
         return;
       }
-
       setCalendarEvents(data.events || []);
       console.log(`Loaded ${data.events?.length || 0} calendar events`);
     } catch (error) {
@@ -145,17 +161,13 @@ const DoctorPortal = () => {
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
-
       try {
         // First, find the doctor record for this authenticated user
-        const { data: doctor, error: doctorError } = await supabase
-          .from('doctors')
-          .select('*')
-          .eq('email', user.email)
-          .maybeSingle();
-
+        const {
+          data: doctor,
+          error: doctorError
+        } = await supabase.from('doctors').select('*').eq('email', user.email).maybeSingle();
         if (doctorError) throw doctorError;
-
         if (!doctor) {
           toast({
             title: "Access Denied",
@@ -165,19 +177,16 @@ const DoctorPortal = () => {
           setLoading(false);
           return;
         }
-
         setDoctorRecord(doctor);
 
         // Get current active block (only show current, not old completed ones)
-        const { data: blocks, error: blockError } = await supabase
-          .from('blocks')
-          .select('*')
-          .eq('status', 'collecting')
-          .order('created_at', { ascending: false })
-          .limit(1);
-
+        const {
+          data: blocks,
+          error: blockError
+        } = await supabase.from('blocks').select('*').eq('status', 'collecting').order('created_at', {
+          ascending: false
+        }).limit(1);
         if (blockError) throw blockError;
-
         if (blocks && blocks.length > 0) {
           const block = blocks[0];
           setCurrentBlock(block);
@@ -185,12 +194,11 @@ const DoctorPortal = () => {
           // Generate weekend options for the 7-week block
           const startMonday = parseLocalDate(block.start_monday_date);
           const weekendOptions = [];
-          
           for (let week = 0; week < 7; week++) {
             const weekStart = addWeeks(startMonday, week);
             const friday = addDays(weekStart, 4); // Friday is 4 days after Monday
             const sunday = addDays(weekStart, 6); // Sunday is 6 days after Monday
-            
+
             weekendOptions.push({
               id: week + 1,
               dates: `${format(friday, 'MMM d')}-${format(sunday, 'd')}`,
@@ -203,47 +211,32 @@ const DoctorPortal = () => {
           setWeekends(weekendOptions);
 
           // Get doctor's existing request for this block
-          const { data: request, error: requestError } = await supabase
-            .from('doctor_requests')
-            .select('*')
-            .eq('block_id', block.id)
-            .eq('doctor_id', doctor.id)
-            .maybeSingle();
-
+          const {
+            data: request,
+            error: requestError
+          } = await supabase.from('doctor_requests').select('*').eq('block_id', block.id).eq('doctor_id', doctor.id).maybeSingle();
           if (requestError) throw requestError;
 
           // Fetch all doctors and their requests for team status (ONLY for current block)
-          const { data: allDoctorsData, error: allDoctorsError } = await supabase
-            .from('doctors')
-            .select('*')
-            .eq('active', true)
-            .order('name');
-
+          const {
+            data: allDoctorsData,
+            error: allDoctorsError
+          } = await supabase.from('doctors').select('*').eq('active', true).order('name');
           if (allDoctorsError) throw allDoctorsError;
           setAllDoctors(allDoctorsData || []);
-
-          const { data: allRequestsData, error: allRequestsError } = await supabase
-            .from('doctor_requests')
-            .select('*, doctors(name, email)')
-            .eq('block_id', block.id); // CRITICAL: Only get requests for current block
+          const {
+            data: allRequestsData,
+            error: allRequestsError
+          } = await supabase.from('doctor_requests').select('*, doctors(name, email)').eq('block_id', block.id); // CRITICAL: Only get requests for current block
 
           if (allRequestsError) throw allRequestsError;
           setAllDoctorRequests(allRequestsData || []);
-
           if (request) {
             setDoctorRequest(request);
-            setSelectedUnavailableDates(
-              Array.isArray(request.unavailable_dates) 
-                ? request.unavailable_dates.map((date: string) => parseLocalDate(date))
-                : []
-            );
-            setPreferredWeekends(
-              Array.isArray(request.preferred_weekends) 
-                ? request.preferred_weekends as number[] 
-                : []
-            );
+            setSelectedUnavailableDates(Array.isArray(request.unavailable_dates) ? request.unavailable_dates.map((date: string) => parseLocalDate(date)) : []);
+            setPreferredWeekends(Array.isArray(request.preferred_weekends) ? request.preferred_weekends as number[] : []);
             setNotes(request.notes || "");
-            setStatus((request.status as 'not_started' | 'in_progress' | 'submitted') || 'not_started');
+            setStatus(request.status as 'not_started' | 'in_progress' | 'submitted' || 'not_started');
           }
         }
       } catch (error) {
@@ -257,13 +250,10 @@ const DoctorPortal = () => {
         setLoading(false);
       }
     };
-
     fetchData();
   }, [user]);
-
   const handleSaveDraft = async () => {
     if (!currentBlock || !doctorRecord) return;
-    
     setSaving(true);
     try {
       const requestData = {
@@ -275,31 +265,25 @@ const DoctorPortal = () => {
         status: 'in_progress',
         updated_at: new Date().toISOString()
       };
-
       if (doctorRequest) {
         // Update existing request
-        const { error } = await supabase
-          .from('doctor_requests')
-          .update(requestData)
-          .eq('id', doctorRequest.id);
-        
+        const {
+          error
+        } = await supabase.from('doctor_requests').update(requestData).eq('id', doctorRequest.id);
         if (error) throw error;
       } else {
         // Create new request
-        const { data, error } = await supabase
-          .from('doctor_requests')
-          .insert([requestData])
-          .select()
-          .single();
-        
+        const {
+          data,
+          error
+        } = await supabase.from('doctor_requests').insert([requestData]).select().single();
         if (error) throw error;
         setDoctorRequest(data);
       }
-
       setStatus('in_progress');
       toast({
         title: "Draft Saved",
-        description: "Your preferences have been saved. You can submit when ready.",
+        description: "Your preferences have been saved. You can submit when ready."
       });
     } catch (error) {
       console.error('Error saving draft:', error);
@@ -312,10 +296,8 @@ const DoctorPortal = () => {
       setSaving(false);
     }
   };
-
   const handleSubmit = async () => {
     if (!currentBlock || !doctorRecord) return;
-    
     setSaving(true);
     try {
       const requestData = {
@@ -328,31 +310,25 @@ const DoctorPortal = () => {
         submitted_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
-
       if (doctorRequest) {
         // Update existing request
-        const { error } = await supabase
-          .from('doctor_requests')
-          .update(requestData)
-          .eq('id', doctorRequest.id);
-        
+        const {
+          error
+        } = await supabase.from('doctor_requests').update(requestData).eq('id', doctorRequest.id);
         if (error) throw error;
       } else {
         // Create new request
-        const { data, error } = await supabase
-          .from('doctor_requests')
-          .insert([requestData])
-          .select()
-          .single();
-        
+        const {
+          data,
+          error
+        } = await supabase.from('doctor_requests').insert([requestData]).select().single();
         if (error) throw error;
         setDoctorRequest(data);
       }
-
       setStatus('submitted');
       toast({
         title: "Preferences Submitted",
-        description: "Your call preferences have been submitted successfully.",
+        description: "Your call preferences have been submitted successfully."
       });
     } catch (error) {
       console.error('Error submitting preferences:', error);
@@ -365,7 +341,6 @@ const DoctorPortal = () => {
       setSaving(false);
     }
   };
-
   const getStatusBadge = () => {
     switch (status) {
       case 'not_started':
@@ -378,25 +353,20 @@ const DoctorPortal = () => {
   };
 
   // Check if editing is allowed (not if block is closed/published)
-  const canEdit = currentBlock && (currentBlock.status === 'collecting');
+  const canEdit = currentBlock && currentBlock.status === 'collecting';
   const isSubmitted = status === 'submitted';
-
   if (loading) {
-    return (
-      <ProtectedRoute>
+    return <ProtectedRoute>
         <div className="min-h-screen bg-background flex items-center justify-center">
           <div className="text-center">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-muted-foreground">Loading block information...</p>
           </div>
         </div>
-      </ProtectedRoute>
-    );
+      </ProtectedRoute>;
   }
-
   if (!currentBlock) {
-    return (
-      <ProtectedRoute>
+    return <ProtectedRoute>
         <div className="min-h-screen bg-background p-4">
           <div className="container mx-auto max-w-4xl">
             <div className="text-center py-16">
@@ -409,12 +379,9 @@ const DoctorPortal = () => {
             </div>
           </div>
         </div>
-      </ProtectedRoute>
-    );
+      </ProtectedRoute>;
   }
-
-  return (
-    <ProtectedRoute>
+  return <ProtectedRoute>
       <div className="min-h-screen bg-background p-4">
         <div className="container mx-auto max-w-4xl">
           {/* Header */}
@@ -427,16 +394,10 @@ const DoctorPortal = () => {
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
-                {isAdmin && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => navigate('/admin')}
-                    className="flex items-center gap-2"
-                  >
+                {isAdmin && <Button variant="outline" onClick={() => navigate('/admin')} className="flex items-center gap-2">
                     <Settings className="h-4 w-4" />
                     Admin Dashboard
-                  </Button>
-                )}
+                  </Button>}
               </div>
             </div>
             <p className="text-muted-foreground">Submit your time-off requests and weekend preferences for the upcoming call block.</p>
@@ -499,74 +460,48 @@ const DoctorPortal = () => {
                     <div className="space-y-4">
                       {/* Day Headers */}
                       <div className="grid grid-cols-7 gap-1 mb-2">
-                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                          <div key={day} className="text-center text-xs sm:text-sm font-medium text-muted-foreground py-2">
+                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <div key={day} className="text-center text-xs sm:text-sm font-medium text-muted-foreground py-2">
                             {day}
-                          </div>
-                        ))}
+                          </div>)}
                       </div>
 
                       {/* 7x7 Date Grid */}
                       <div className="grid grid-cols-7 gap-1">
                         {(() => {
-                          const startMonday = parseLocalDate(currentBlock.start_monday_date);
-                          const dates = [];
-                          
-                          // Generate all 49 dates (7 weeks x 7 days)
-                          for (let week = 0; week < 7; week++) {
-                            for (let day = 0; day < 7; day++) {
-                              const currentDate = addDays(addWeeks(startMonday, week), day);
-                              const dateString = format(currentDate, 'yyyy-MM-dd');
-                              const isSelected = selectedUnavailableDates.some(
-                                selectedDate => format(selectedDate, 'yyyy-MM-dd') === dateString
-                              );
-                              const holidayInfo = getHolidayInfo(currentDate);
-                              const isHolidayDate = !!holidayInfo;
+                        const startMonday = parseLocalDate(currentBlock.start_monday_date);
+                        const dates = [];
 
-                              dates.push(
-                                <button
-                                  key={dateString}
-                                  type="button"
-                                  disabled={!canEdit}
-                                  title={holidayInfo ? holidayInfo.name : undefined}
-                                  onClick={() => {
-                                    if (isSelected) {
-                                      // Remove date
-                                      setSelectedUnavailableDates(
-                                        selectedUnavailableDates.filter(
-                                          selectedDate => format(selectedDate, 'yyyy-MM-dd') !== dateString
-                                        )
-                                      );
-                                    } else {
-                                      // Add date
-                                      setSelectedUnavailableDates([...selectedUnavailableDates, currentDate]);
-                                    }
-                                  }}
-                                  className={`
+                        // Generate all 49 dates (7 weeks x 7 days)
+                        for (let week = 0; week < 7; week++) {
+                          for (let day = 0; day < 7; day++) {
+                            const currentDate = addDays(addWeeks(startMonday, week), day);
+                            const dateString = format(currentDate, 'yyyy-MM-dd');
+                            const isSelected = selectedUnavailableDates.some(selectedDate => format(selectedDate, 'yyyy-MM-dd') === dateString);
+                            const holidayInfo = getHolidayInfo(currentDate);
+                            const isHolidayDate = !!holidayInfo;
+                            dates.push(<button key={dateString} type="button" disabled={!canEdit} title={holidayInfo ? holidayInfo.name : undefined} onClick={() => {
+                              if (isSelected) {
+                                // Remove date
+                                setSelectedUnavailableDates(selectedUnavailableDates.filter(selectedDate => format(selectedDate, 'yyyy-MM-dd') !== dateString));
+                              } else {
+                                // Add date
+                                setSelectedUnavailableDates([...selectedUnavailableDates, currentDate]);
+                              }
+                            }} className={`
                                     aspect-square p-1 sm:p-2 text-xs sm:text-sm border rounded-md transition-all relative min-h-[40px] sm:min-h-[48px]
-                                    ${isSelected 
-                                      ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' 
-                                      : isHolidayDate
-                                        ? 'bg-accent/10 border-accent text-accent hover:bg-accent/20 font-semibold'
-                                        : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'
-                                    }
+                                    ${isSelected ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' : isHolidayDate ? 'bg-accent/10 border-accent text-accent hover:bg-accent/20 font-semibold' : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'}
                                     ${!canEdit ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 active:scale-95'}
-                                  `}
-                                >
+                                  `}>
                                   <div className="flex flex-col items-center justify-center h-full">
                                     <span className="font-medium">{format(currentDate, 'd')}</span>
                                     <span className="text-xs opacity-75 hidden sm:block">{format(currentDate, 'MMM')}</span>
-                                    {isHolidayDate && (
-                                      <Star className="h-2 w-2 absolute top-1 right-1" />
-                                    )}
+                                    {isHolidayDate && <Star className="h-2 w-2 absolute top-1 right-1" />}
                                   </div>
-                                </button>
-                              );
-                            }
+                                </button>);
                           }
-                          
-                          return dates;
-                        })()}
+                        }
+                        return dates;
+                      })()}
                       </div>
 
                       {/* Legend */}
@@ -587,18 +522,14 @@ const DoctorPortal = () => {
                         </div>
                       </div>
                     </div>
-                    {selectedUnavailableDates.length > 0 && (
-                      <div className="mt-4">
+                    {selectedUnavailableDates.length > 0 && <div className="mt-4">
                         <Label className="text-sm font-medium">Selected Unavailable Dates:</Label>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedUnavailableDates.map((date) => (
-                            <Badge key={date.toISOString()} variant="secondary" className="text-xs">
+                          {selectedUnavailableDates.map(date => <Badge key={date.toISOString()} variant="secondary" className="text-xs">
                               {format(date, 'MMM d, yyyy')}
-                            </Badge>
-                          ))}
+                            </Badge>)}
                         </div>
-                      </div>
-                    )}
+                      </div>}
                   </CardContent>
                 </Card>
 
@@ -606,50 +537,30 @@ const DoctorPortal = () => {
                 <Card className="shadow-soft">
                   <CardHeader>
                     <CardTitle className="text-lg sm:text-xl">Weekend Preferences</CardTitle>
-                    <CardDescription className="text-sm sm:text-base">
-                      Select your preferred weekend(s) for call duties (Friday-Sunday blocks)
-                    </CardDescription>
+                    <CardDescription className="text-sm sm:text-base">Select your preferred weekend(s) for call duties (Friday-Sunday blocks).  </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {weekends.map((weekend) => {
-                        // Find doctors who have already requested this weekend
-                        const doctorsWhoRequestedWeekend = allDoctorRequests
-                          .filter(request => 
-                            request.status === 'submitted' && 
-                            Array.isArray(request.preferred_weekends) && 
-                            request.preferred_weekends.includes(weekend.id)
-                          )
-                          .map(request => request.doctors?.name)
-                          .filter(Boolean);
-
-                        return (
-                          <div key={weekend.id} className="flex items-start space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                            <Checkbox
-                              id={`weekend-${weekend.id}`}
-                              checked={preferredWeekends.includes(weekend.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setPreferredWeekends([...preferredWeekends, weekend.id]);
-                                } else {
-                                  setPreferredWeekends(preferredWeekends.filter(id => id !== weekend.id));
-                                }
-                              }}
-                              disabled={!canEdit}
-                              className="mt-0.5 flex-shrink-0"
-                            />
+                      {weekends.map(weekend => {
+                      // Find doctors who have already requested this weekend
+                      const doctorsWhoRequestedWeekend = allDoctorRequests.filter(request => request.status === 'submitted' && Array.isArray(request.preferred_weekends) && request.preferred_weekends.includes(weekend.id)).map(request => request.doctors?.name).filter(Boolean);
+                      return <div key={weekend.id} className="flex items-start space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                            <Checkbox id={`weekend-${weekend.id}`} checked={preferredWeekends.includes(weekend.id)} onCheckedChange={checked => {
+                          if (checked) {
+                            setPreferredWeekends([...preferredWeekends, weekend.id]);
+                          } else {
+                            setPreferredWeekends(preferredWeekends.filter(id => id !== weekend.id));
+                          }
+                        }} disabled={!canEdit} className="mt-0.5 flex-shrink-0" />
                             <Label htmlFor={`weekend-${weekend.id}`} className="flex-1 cursor-pointer">
                               <div className="font-medium text-sm sm:text-base">{weekend.label}</div>
                               <div className="text-xs sm:text-sm text-muted-foreground">{weekend.dates}</div>
-                              {doctorsWhoRequestedWeekend.length > 0 && (
-                                <div className="text-xs text-destructive mt-1">
+                              {doctorsWhoRequestedWeekend.length > 0 && <div className="text-xs text-destructive mt-1">
                                   Already requested by: {doctorsWhoRequestedWeekend.join(', ')}
-                                </div>
-                              )}
+                                </div>}
                             </Label>
-                          </div>
-                        );
-                      })}
+                          </div>;
+                    })}
                     </div>
                   </CardContent>
                 </Card>
@@ -664,67 +575,44 @@ const DoctorPortal = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Textarea
-                    placeholder="Enter any additional notes or special requests..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="min-h-[80px] sm:min-h-[100px] text-sm sm:text-base"
-                    disabled={!canEdit}
-                  />
+                  <Textarea placeholder="Enter any additional notes or special requests..." value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[80px] sm:min-h-[100px] text-sm sm:text-base" disabled={!canEdit} />
                 </CardContent>
               </Card>
 
               {/* Submission Status */}
-              {isSubmitted && canEdit && (
-                <Alert>
+              {isSubmitted && canEdit && <Alert>
                   <CheckCircle className="h-4 w-4" />
                   <AlertDescription className="text-sm sm:text-base">
                     <strong>Preferences Submitted:</strong> Your call preferences have been submitted successfully. 
                     You can still modify your submission until the block is closed for scheduling.
                   </AlertDescription>
-                </Alert>
-              )}
+                </Alert>}
 
-              {isSubmitted && !canEdit && (
-                <Alert>
+              {isSubmitted && !canEdit && <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription className="text-sm sm:text-base">
                     <strong>Block Closed:</strong> This call block has been closed for scheduling. 
                     Your preferences are locked and cannot be modified.
                   </AlertDescription>
-                </Alert>
-              )}
+                </Alert>}
 
-              {!isSubmitted && !canEdit && (
-                <Alert variant="destructive">
+              {!isSubmitted && !canEdit && <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription className="text-sm sm:text-base">
                     <strong>Block Closed:</strong> This call block has been closed. 
                     New submissions are no longer accepted.
                   </AlertDescription>
-                </Alert>
-              )}
+                </Alert>}
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                <Button 
-                  variant="outline" 
-                  size="lg" 
-                  onClick={handleSaveDraft}
-                  disabled={!canEdit || saving}
-                  className="w-full sm:w-auto"
-                >
+                <Button variant="outline" size="lg" onClick={handleSaveDraft} disabled={!canEdit || saving} className="w-full sm:flex-1 sm:flex-none">
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? "Saving..." : "Save Draft"}
                 </Button>
-                 <Button 
-                  size="lg" 
-                  onClick={handleSubmit}
-                  disabled={!canEdit || saving}
-                  className="w-full sm:w-auto bg-gradient-primary hover:opacity-90"
-                >
+                <Button size="lg" onClick={handleSubmit} disabled={!canEdit || saving} className="w-full sm:flex-1 sm:flex-none bg-gradient-primary hover:opacity-90">
                   <Send className="h-4 w-4 mr-2" />
-                  {saving ? "Submitting..." : (isSubmitted ? "Update Submission" : "Submit Preferences")}
+                  {saving ? "Submitting..." : isSubmitted ? "Update Submission" : "Submit Preferences"}
                 </Button>
               </div>
             </TabsContent>
@@ -743,69 +631,50 @@ const DoctorPortal = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 sm:space-y-4">
-                    {allDoctors.map((doctor) => {
-                      const request = allDoctorRequests.find(req => req.doctors?.email === doctor.email);
-                      const status = request?.status || 'not_started';
-                      
-                      return (
-                        <div key={doctor.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg border border-border space-y-2 sm:space-y-0">
+                    {allDoctors.map(doctor => {
+                    const request = allDoctorRequests.find(req => req.doctors?.email === doctor.email);
+                    const status = request?.status || 'not_started';
+                    return <div key={doctor.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg border border-border space-y-2 sm:space-y-0">
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm sm:text-base truncate">{doctor.name}</div>
                             <div className="text-xs sm:text-sm text-muted-foreground truncate">{doctor.email}</div>
                             
                             {/* Show basic request info if submitted */}
-                            {request && status === 'submitted' && (
-                              <div className="mt-2 space-y-1">
-                                {request.unavailable_dates && request.unavailable_dates.length > 0 && (
-                                  <div className="text-xs">
+                            {request && status === 'submitted' && <div className="mt-2 space-y-1">
+                                {request.unavailable_dates && request.unavailable_dates.length > 0 && <div className="text-xs">
                                     <span className="text-muted-foreground">Unavailable dates: </span>
                                     <span className="font-medium">
-                                      {request.unavailable_dates.map((dateStr: string) => 
-                                        format(parseLocalDate(dateStr), 'MMM d')
-                                      ).join(', ')}
+                                      {request.unavailable_dates.map((dateStr: string) => format(parseLocalDate(dateStr), 'MMM d')).join(', ')}
                                     </span>
-                                  </div>
-                                )}
-                                {request.preferred_weekends && request.preferred_weekends.length > 0 && (
-                                  <div className="text-xs">
+                                  </div>}
+                                {request.preferred_weekends && request.preferred_weekends.length > 0 && <div className="text-xs">
                                     <span className="text-muted-foreground">Preferred weekends: </span>
                                     <span className="font-medium">
                                       {request.preferred_weekends.map((w: number) => `Week ${w}`).join(', ')}
                                     </span>
-                                  </div>
-                                )}
-                                {request.notes && request.notes.trim() && (
-                                  <div className="text-xs">
+                                  </div>}
+                                {request.notes && request.notes.trim() && <div className="text-xs">
                                     <span className="text-muted-foreground">Notes: </span>
                                     <span className="font-medium">{request.notes}</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                  </div>}
+                              </div>}
                           </div>
                           <div className="flex justify-end sm:ml-4">
-                            {status === 'submitted' && (
-                              <Badge variant="default" className="bg-success text-success-foreground text-xs">
+                            {status === 'submitted' && <Badge variant="default" className="bg-success text-success-foreground text-xs">
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 Submitted
-                              </Badge>
-                            )}
-                            {status === 'in_progress' && (
-                              <Badge variant="secondary" className="text-xs">
+                              </Badge>}
+                            {status === 'in_progress' && <Badge variant="secondary" className="text-xs">
                                 <Clock className="h-3 w-3 mr-1" />
                                 In Progress
-                              </Badge>
-                            )}
-                            {status === 'not_started' && (
-                              <Badge variant="outline" className="text-xs">
+                              </Badge>}
+                            {status === 'not_started' && <Badge variant="outline" className="text-xs">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
                                 Not Started
-                              </Badge>
-                            )}
+                              </Badge>}
                           </div>
-                        </div>
-                      );
-                    })}
+                        </div>;
+                  })}
                   </div>
                   
                   {/* Summary Stats */}
@@ -852,25 +721,13 @@ const DoctorPortal = () => {
                       {format(currentMonth, 'MMMM yyyy')}
                     </h3>
                     <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}>
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentMonth(new Date())}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date())}>
                         Today
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}>
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
@@ -880,119 +737,104 @@ const DoctorPortal = () => {
                   <div className="space-y-2">
                     {/* Day Headers */}
                     <div className="grid grid-cols-7 gap-1 mb-2">
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                        <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
                           {day}
-                        </div>
-                      ))}
+                        </div>)}
                     </div>
 
                     {/* Calendar Days */}
                     <div className="grid grid-cols-7 gap-1">
                       {(() => {
-                        const monthStart = startOfMonth(currentMonth);
-                        const monthEnd = endOfMonth(currentMonth);
-                        const startDate = new Date(monthStart);
-                        startDate.setDate(startDate.getDate() - monthStart.getDay()); // Start from Sunday
-                        
-                        const endDate = new Date(monthEnd);
-                        endDate.setDate(endDate.getDate() + (6 - monthEnd.getDay())); // End on Saturday
-                        
-                        const days = eachDayOfInterval({ start: startDate, end: endDate });
-                        
-                        return days.map((day) => {
-                          const isCurrentMonth = isSameMonth(day, currentMonth);
-                          const isCurrentDay = isToday(day);
-                          const dayEvents = calendarEvents.filter(event => {
-                            // Compare date strings directly to avoid timezone issues
-                            const eventDateStr = event.date.split('T')[0]; // Get YYYY-MM-DD part
-                            const dayDateStr = format(day, 'yyyy-MM-dd');
-                            return eventDateStr === dayDateStr;
-                          }).sort((a, b) => {
-                            // Sort by priority: Call events first, then holidays, then Out events
-                            const aIsCall = a.title.toLowerCase().includes('call');
-                            const bIsCall = b.title.toLowerCase().includes('call');
-                            const aIsHoliday = (a as any).isHoliday;
-                            const bIsHoliday = (b as any).isHoliday;
-                            const aIsOut = a.title.toLowerCase().includes('out');
-                            const bIsOut = b.title.toLowerCase().includes('out');
-                            
-                            // Call events come first
-                            if (aIsCall && !bIsCall) return -1;
-                            if (!aIsCall && bIsCall) return 1;
-                            
-                            // If both are calls or neither are calls, check for holidays
-                            if (aIsCall === bIsCall) {
-                              // Holidays come after calls but before out events
-                              if (aIsHoliday && !bIsHoliday && !bIsCall) return -1;
-                              if (!aIsHoliday && bIsHoliday && !aIsCall) return 1;
-                            }
-                            
-                            // Within same type, sort alphabetically
-                            return a.title.localeCompare(b.title);
-                          });
-                          
-                          const getEventColor = (calendarId: string, isUserEvent: boolean, eventTitle: string, doctorName: string, isHoliday?: boolean) => {
-                            // Check if this is a holiday
-                            if (isHoliday) {
-                              return "bg-amber-500 text-white font-medium border border-amber-600";
-                            }
-                            
-                            // Check if this event contains the current doctor's name
-                            const isCurrentDoctor = eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[0]) || 
-                                                   eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[1]);
-                            
-                            if (isCurrentDoctor) {
-                              // Current doctor's events - use bright, distinctive colors
-                              if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
-                                return "bg-green-600 text-white font-bold border-2 border-green-800 shadow-md"; // Bright green with border
-                              } else {
-                                return "bg-red-600 text-white font-bold border-2 border-red-800 shadow-md"; // Bright red with border
-                              }
-                            } else if (isUserEvent) {
-                              // User's events - use distinct color families
-                              if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
-                                return "bg-blue-600 text-white"; // Blue for calendar 1
-                              } else {
-                                return "bg-purple-600 text-white"; // Purple for calendar 2
-                              }
-                            } else {
-                              // Other events - use complementary distinct colors
-                              if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
-                                return "bg-orange-500 text-white"; // Orange for calendar 1
-                              } else {
-                                return "bg-pink-500 text-white"; // Pink for calendar 2
-                              }
-                            }
-                          };
+                      const monthStart = startOfMonth(currentMonth);
+                      const monthEnd = endOfMonth(currentMonth);
+                      const startDate = new Date(monthStart);
+                      startDate.setDate(startDate.getDate() - monthStart.getDay()); // Start from Sunday
 
-                          return (
-                            <div
-                              key={day.toString()}
-                              className={`
+                      const endDate = new Date(monthEnd);
+                      endDate.setDate(endDate.getDate() + (6 - monthEnd.getDay())); // End on Saturday
+
+                      const days = eachDayOfInterval({
+                        start: startDate,
+                        end: endDate
+                      });
+                      return days.map(day => {
+                        const isCurrentMonth = isSameMonth(day, currentMonth);
+                        const isCurrentDay = isToday(day);
+                        const dayEvents = calendarEvents.filter(event => {
+                          // Compare date strings directly to avoid timezone issues
+                          const eventDateStr = event.date.split('T')[0]; // Get YYYY-MM-DD part
+                          const dayDateStr = format(day, 'yyyy-MM-dd');
+                          return eventDateStr === dayDateStr;
+                        }).sort((a, b) => {
+                          // Sort by priority: Call events first, then holidays, then Out events
+                          const aIsCall = a.title.toLowerCase().includes('call');
+                          const bIsCall = b.title.toLowerCase().includes('call');
+                          const aIsHoliday = (a as any).isHoliday;
+                          const bIsHoliday = (b as any).isHoliday;
+                          const aIsOut = a.title.toLowerCase().includes('out');
+                          const bIsOut = b.title.toLowerCase().includes('out');
+
+                          // Call events come first
+                          if (aIsCall && !bIsCall) return -1;
+                          if (!aIsCall && bIsCall) return 1;
+
+                          // If both are calls or neither are calls, check for holidays
+                          if (aIsCall === bIsCall) {
+                            // Holidays come after calls but before out events
+                            if (aIsHoliday && !bIsHoliday && !bIsCall) return -1;
+                            if (!aIsHoliday && bIsHoliday && !aIsCall) return 1;
+                          }
+
+                          // Within same type, sort alphabetically
+                          return a.title.localeCompare(b.title);
+                        });
+                        const getEventColor = (calendarId: string, isUserEvent: boolean, eventTitle: string, doctorName: string, isHoliday?: boolean) => {
+                          // Check if this is a holiday
+                          if (isHoliday) {
+                            return "bg-amber-500 text-white font-medium border border-amber-600";
+                          }
+
+                          // Check if this event contains the current doctor's name
+                          const isCurrentDoctor = eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[0]) || eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[1]);
+                          if (isCurrentDoctor) {
+                            // Current doctor's events - use bright, distinctive colors
+                            if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
+                              return "bg-green-600 text-white font-bold border-2 border-green-800 shadow-md"; // Bright green with border
+                            } else {
+                              return "bg-red-600 text-white font-bold border-2 border-red-800 shadow-md"; // Bright red with border
+                            }
+                          } else if (isUserEvent) {
+                            // User's events - use distinct color families
+                            if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
+                              return "bg-blue-600 text-white"; // Blue for calendar 1
+                            } else {
+                              return "bg-purple-600 text-white"; // Purple for calendar 2
+                            }
+                          } else {
+                            // Other events - use complementary distinct colors
+                            if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
+                              return "bg-orange-500 text-white"; // Orange for calendar 1
+                            } else {
+                              return "bg-pink-500 text-white"; // Pink for calendar 2
+                            }
+                          }
+                        };
+                        return <div key={day.toString()} className={`
                                 min-h-[80px] p-2 border rounded-md
                                 ${isCurrentMonth ? 'bg-background' : 'bg-muted/30 text-muted-foreground'}
                                 ${isCurrentDay ? 'ring-2 ring-primary' : ''}
-                              `}
-                            >
+                              `}>
                               <div className="text-sm font-medium mb-1">
                                 {format(day, 'd')}
                               </div>
                               <div className="space-y-1">
-                                 {dayEvents.map((event, idx) => (
-                                   <div
-                                     key={idx}
-                                     className={`text-[10px] p-0.5 rounded text-center leading-tight ${getEventColor(event.calendarId, event.isUserEvent, event.title, doctorRecord?.name || '', (event as any).isHoliday)}`}
-                                     title={`${event.title} - ${event.calendarId.includes('odn75bvuc02onjrb0ai9oskbc4') ? 'Staffing' : 'Call'}`}
-                                   >
+                                 {dayEvents.map((event, idx) => <div key={idx} className={`text-[10px] p-0.5 rounded text-center leading-tight ${getEventColor(event.calendarId, event.isUserEvent, event.title, doctorRecord?.name || '', (event as any).isHoliday)}`} title={`${event.title} - ${event.calendarId.includes('odn75bvuc02onjrb0ai9oskbc4') ? 'Staffing' : 'Call'}`}>
                                      {event.title}
-                                   </div>
-                                 ))}
+                                   </div>)}
                               </div>
-                            </div>
-                          );
-                        });
-                      })()}
+                            </div>;
+                      });
+                    })()}
                     </div>
                   </div>
 
@@ -1009,20 +851,16 @@ const DoctorPortal = () => {
                     </AlertDescription>
                   </Alert>
 
-                  {calendarLoading && (
-                    <div className="text-center py-8">
+                  {calendarLoading && <div className="text-center py-8">
                       <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                       <p className="text-sm text-muted-foreground">Loading calendar events...</p>
-                    </div>
-                  )}
+                    </div>}
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
         </div>
       </div>
-    </ProtectedRoute>
-  );
+    </ProtectedRoute>;
 };
-
 export default DoctorPortal;
