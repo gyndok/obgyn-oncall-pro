@@ -214,7 +214,7 @@ const DoctorPortal = () => {
             setDoctorRequest(request);
             setSelectedUnavailableDates(
               Array.isArray(request.unavailable_dates) 
-                ? request.unavailable_dates.map((date: string) => new Date(date))
+                ? request.unavailable_dates.map((date: string) => parseLocalDate(date))
                 : []
             );
             setPreferredWeekends(
