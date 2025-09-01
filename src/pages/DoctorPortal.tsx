@@ -737,9 +737,10 @@ const DoctorPortal = () => {
                           const isCurrentMonth = isSameMonth(day, currentMonth);
                           const isCurrentDay = isToday(day);
                           const dayEvents = calendarEvents.filter(event => {
-                            const eventDate = new Date(event.date);
-                            const isSameDay = eventDate.toDateString() === day.toDateString();
-                            return isSameDay;
+                            // Compare date strings directly to avoid timezone issues
+                            const eventDateStr = event.date.split('T')[0]; // Get YYYY-MM-DD part
+                            const dayDateStr = format(day, 'yyyy-MM-dd');
+                            return eventDateStr === dayDateStr;
                           });
                           
                           return (
