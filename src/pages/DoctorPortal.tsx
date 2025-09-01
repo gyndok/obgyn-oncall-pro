@@ -1,23 +1,60 @@
-import { useState, useEffect } from "react";
-import { Calendar as CalendarIcon, Save, Send, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { format, parseISO, addDays, addWeeks, isSameDay, getYear, getMonth, getDate } from "date-fns";
+import { CalendarIcon, Clock, CheckCircle, AlertTriangle, Star, Calendar as CalendarIconLucide, Save, Send, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { format, addWeeks, startOfWeek, endOfWeek, addDays } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 // Helper function to parse date-only strings as local dates (avoiding UTC timezone issues)
 const parseLocalDate = (dateString: string) => {
   const [year, month, day] = dateString.split('-').map(Number);
   return new Date(year, month - 1, day); // month is 0-indexed
+};
+
+// Holiday detection function
+const getHolidays = (year: number) => {
+  const holidays = [];
+  
+  // Fixed holidays
+  holidays.push(new Date(year, 0, 1)); // New Year's Day
+  holidays.push(new Date(year, 6, 4)); // Independence Day
+  holidays.push(new Date(year, 10, 11)); // Veterans Day
+  holidays.push(new Date(year, 11, 25)); // Christmas Day
+  
+  // Memorial Day (last Monday in May)
+  const memorialDay = new Date(year, 4, 31);
+  memorialDay.setDate(31 - memorialDay.getDay());
+  holidays.push(memorialDay);
+  
+  // Labor Day (first Monday in September)
+  const laborDay = new Date(year, 8, 1);
+  laborDay.setDate(1 + (7 - laborDay.getDay()) % 7);
+  holidays.push(laborDay);
+  
+  // Thanksgiving (fourth Thursday in November)
+  const thanksgiving = new Date(year, 10, 1);
+  thanksgiving.setDate(1 + (4 - thanksgiving.getDay() + 7) % 7 + 21);
+  holidays.push(thanksgiving);
+  
+  return holidays;
+};
+
+const isHoliday = (date: Date) => {
+  const year = getYear(date);
+  const holidays = getHolidays(year);
+  return holidays.some(holiday => isSameDay(holiday, date));
 };
 
 const DoctorPortal = () => {
@@ -359,6 +396,7 @@ const DoctorPortal = () => {
                         const isSelected = selectedUnavailableDates.some(
                           selectedDate => format(selectedDate, 'yyyy-MM-dd') === dateString
                         );
+                        const isHolidayDate = isHoliday(currentDate);
 
                         dates.push(
                           <button
@@ -379,10 +417,12 @@ const DoctorPortal = () => {
                               }
                             }}
                             className={`
-                              aspect-square p-1 text-sm border rounded-md transition-all
+                              aspect-square p-1 text-sm border rounded-md transition-all relative
                               ${isSelected 
                                 ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' 
-                                : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'
+                                : isHolidayDate
+                                  ? 'bg-warning/20 border-warning text-warning-foreground hover:bg-warning/30'
+                                  : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'
                               }
                               ${status === 'submitted' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
                             `}
@@ -390,6 +430,9 @@ const DoctorPortal = () => {
                             <div className="flex flex-col items-center justify-center h-full">
                               <span className="font-medium">{format(currentDate, 'd')}</span>
                               <span className="text-xs opacity-75">{format(currentDate, 'MMM')}</span>
+                              {isHolidayDate && (
+                                <Star className="h-2 w-2 absolute top-1 right-1" />
+                              )}
                             </div>
                           </button>
                         );
@@ -405,6 +448,12 @@ const DoctorPortal = () => {
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-destructive border rounded"></div>
                     <span>Unavailable</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-warning/20 border-warning border rounded relative">
+                      <Star className="h-2 w-2 absolute top-0.5 right-0.5 text-warning" />
+                    </div>
+                    <span>Holiday</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-background border rounded"></div>
