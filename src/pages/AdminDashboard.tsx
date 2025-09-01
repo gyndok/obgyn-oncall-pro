@@ -1288,14 +1288,14 @@ const AdminDashboard = () => {
 
       {/* Edit Request Dialog */}
       <Dialog open={showEditRequestDialog} onOpenChange={setShowEditRequestDialog}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Doctor Request</DialogTitle>
             <DialogDescription>
               Manually edit unavailable dates and preferences for this doctor
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-6 py-4">
+          <div className="space-y-6 py-4 overflow-y-auto flex-1 min-h-0">
             {/* Unavailable Dates Section */}
             <div>
               <Label className="text-base font-medium">Unavailable Dates</Label>
