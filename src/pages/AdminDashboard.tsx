@@ -302,15 +302,24 @@ const AdminDashboard = () => {
 
       if (error) throw error;
 
+      // Update the current block state immediately for instant UI feedback
+      setCurrentBlock({
+        ...currentBlock,
+        start_monday_date: format(editStartDate, 'yyyy-MM-dd'),
+        end_sunday_date: format(calculatedEndDate, 'yyyy-MM-dd')
+      });
+
       toast({
         title: "Success",
-        description: "Block dates updated successfully",
+        description: `Block dates updated: ${format(editStartDate, 'MMM d, yyyy')} - ${format(calculatedEndDate, 'MMM d, yyyy')}`,
       });
 
       setIsEditingDates(false);
       setEditStartDate(undefined);
       setEditEndDate(undefined);
-      fetchData();
+      
+      // Fetch fresh data from database
+      await fetchData();
     } catch (error) {
       console.error('Error updating block dates:', error);
       toast({
