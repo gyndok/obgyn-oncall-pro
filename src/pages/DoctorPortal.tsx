@@ -743,8 +743,19 @@ const DoctorPortal = () => {
                             return eventDateStr === dayDateStr;
                           });
                           
-                          const getEventColor = (calendarId: string, isUserEvent: boolean) => {
-                            if (isUserEvent) {
+                          const getEventColor = (calendarId: string, isUserEvent: boolean, eventTitle: string, doctorName: string) => {
+                            // Check if this event contains the current doctor's name
+                            const isCurrentDoctor = eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[0]) || 
+                                                   eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[1]);
+                            
+                            if (isCurrentDoctor) {
+                              // Current doctor's events - use bright, distinctive colors
+                              if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
+                                return "bg-green-600 text-white font-bold border-2 border-green-800 shadow-md"; // Bright green with border
+                              } else {
+                                return "bg-red-600 text-white font-bold border-2 border-red-800 shadow-md"; // Bright red with border
+                              }
+                            } else if (isUserEvent) {
                               // User's events - use distinct color families
                               if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {
                                 return "bg-blue-600 text-white"; // Blue for calendar 1
@@ -777,7 +788,7 @@ const DoctorPortal = () => {
                                  {dayEvents.map((event, idx) => (
                                    <div
                                      key={idx}
-                                     className={`text-xs p-1 rounded text-center ${getEventColor(event.calendarId, event.isUserEvent)}`}
+                                     className={`text-xs p-1 rounded text-center ${getEventColor(event.calendarId, event.isUserEvent, event.title, doctorRecord?.name || '')}`}
                                      title={`${event.title} - ${event.calendarId.includes('odn75bvuc02onjrb0ai9oskbc4') ? 'Calendar 1' : 'Calendar 2'}`}
                                    >
                                      {event.title}
@@ -791,17 +802,33 @@ const DoctorPortal = () => {
                     </div>
                   </div>
 
-                  {/* Calendar Legend */}
-                  <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-primary rounded"></div>
-                      <span>Your Call Duties</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-accent rounded"></div>
-                      <span>Other Assignments</span>
-                    </div>
-                  </div>
+                   {/* Calendar Legend */}
+                   <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t text-sm">
+                     <div className="flex items-center gap-2">
+                       <div className="w-4 h-4 bg-green-600 border border-green-800 rounded"></div>
+                       <span>Your Call Duties (Calendar 1)</span>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       <div className="w-4 h-4 bg-red-600 border border-red-800 rounded"></div>
+                       <span>Your Call Duties (Calendar 2)</span>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       <div className="w-4 h-4 bg-blue-600 rounded"></div>
+                       <span>Other User Events (Calendar 1)</span>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       <div className="w-4 h-4 bg-purple-600 rounded"></div>
+                       <span>Other User Events (Calendar 2)</span>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       <div className="w-4 h-4 bg-orange-500 rounded"></div>
+                       <span>General Events (Calendar 1)</span>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       <div className="w-4 h-4 bg-pink-500 rounded"></div>
+                       <span>General Events (Calendar 2)</span>
+                     </div>
+                   </div>
 
                   {/* Setup Instructions */}
                   <Alert className="mt-6">
