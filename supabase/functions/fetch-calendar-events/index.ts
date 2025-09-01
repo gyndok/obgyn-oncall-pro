@@ -73,8 +73,8 @@ const handler = async (req: Request): Promise<Response> => {
         const data = await response.json();
         
         if (data.items) {
-          // Process events and add metadata
-          const processedEvents = data.items.map((event: any) => {
+          // Process events and expand multi-day events
+          const processedEvents = data.items.flatMap((event: any) => {
             const startDate = event.start?.dateTime || event.start?.date;
             const endDate = event.end?.dateTime || event.end?.date;
             
@@ -87,27 +87,63 @@ const handler = async (req: Request): Promise<Response> => {
               ))
             );
 
-            return {
-              id: event.id,
-              title: event.summary || 'Untitled Event',
-              description: event.description || '',
-              date: startDate,
-              endDate: endDate,
-              isAllDay: !event.start?.dateTime, // If no time, it's all day
-              calendarId: calendarId,
-              isUserEvent: isUserEvent,
-              location: event.location || '',
-              attendees: event.attendees || [],
-              created: event.created,
-              updated: event.updated,
-              // Add day of week for debugging
-              dayOfWeek: new Date(startDate).getDay(), // 0=Sunday, 5=Friday, 6=Saturday
-              rawEvent: {
-                start: event.start,
-                end: event.end,
-                summary: event.summary
+            // For multi-day events, create an entry for each day
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const events = [];
+            
+            // If it's a multi-day event (end date is different from start date)
+            if (start.toDateString() !== end.toDateString() && event.start?.date) {
+              // Create an event for each day in the range
+              const currentDate = new Date(start);
+              while (currentDate < end) {
+                events.push({
+                  id: `${event.id}_${currentDate.toISOString().split('T')[0]}`,
+                  title: event.summary || 'Untitled Event',
+                  description: event.description || '',
+                  date: currentDate.toISOString().split('T')[0],
+                  endDate: currentDate.toISOString().split('T')[0],
+                  isAllDay: true,
+                  calendarId: calendarId,
+                  isUserEvent: isUserEvent,
+                  location: event.location || '',
+                  attendees: event.attendees || [],
+                  created: event.created,
+                  updated: event.updated,
+                  dayOfWeek: currentDate.getDay(),
+                  rawEvent: {
+                    start: event.start,
+                    end: event.end,
+                    summary: event.summary
+                  }
+                });
+                currentDate.setDate(currentDate.getDate() + 1);
               }
-            };
+            } else {
+              // Single day event
+              events.push({
+                id: event.id,
+                title: event.summary || 'Untitled Event',
+                description: event.description || '',
+                date: startDate,
+                endDate: endDate,
+                isAllDay: !event.start?.dateTime,
+                calendarId: calendarId,
+                isUserEvent: isUserEvent,
+                location: event.location || '',
+                attendees: event.attendees || [],
+                created: event.created,
+                updated: event.updated,
+                dayOfWeek: new Date(startDate).getDay(),
+                rawEvent: {
+                  start: event.start,
+                  end: event.end,
+                  summary: event.summary
+                }
+              });
+            }
+            
+            return events;
           });
 
           allEvents.push(...processedEvents);
