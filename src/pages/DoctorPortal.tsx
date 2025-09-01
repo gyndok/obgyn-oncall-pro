@@ -334,15 +334,90 @@ const DoctorPortal = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Calendar
-                mode="multiple"
-                selected={selectedUnavailableDates}
-                onSelect={(dates) => setSelectedUnavailableDates(dates || [])}
-                fromDate={parseLocalDate(currentBlock.start_monday_date)}
-                toDate={parseLocalDate(currentBlock.end_sunday_date)}
-                className="rounded-md border"
-                disabled={status === 'submitted'}
-              />
+              {/* Custom 7x7 Calendar Grid */}
+              <div className="space-y-4">
+                {/* Day Headers */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                    <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* 7x7 Date Grid */}
+                <div className="grid grid-cols-7 gap-1">
+                  {(() => {
+                    const startMonday = parseLocalDate(currentBlock.start_monday_date);
+                    const dates = [];
+                    
+                    // Generate all 49 dates (7 weeks x 7 days)
+                    for (let week = 0; week < 7; week++) {
+                      for (let day = 0; day < 7; day++) {
+                        const currentDate = addDays(addWeeks(startMonday, week), day);
+                        const dateString = format(currentDate, 'yyyy-MM-dd');
+                        const isSelected = selectedUnavailableDates.some(
+                          selectedDate => format(selectedDate, 'yyyy-MM-dd') === dateString
+                        );
+                        const isWeekend = day >= 5; // Friday, Saturday, Sunday
+
+                        dates.push(
+                          <button
+                            key={dateString}
+                            type="button"
+                            disabled={status === 'submitted'}
+                            onClick={() => {
+                              if (isSelected) {
+                                // Remove date
+                                setSelectedUnavailableDates(
+                                  selectedUnavailableDates.filter(
+                                    selectedDate => format(selectedDate, 'yyyy-MM-dd') !== dateString
+                                  )
+                                );
+                              } else {
+                                // Add date
+                                setSelectedUnavailableDates([...selectedUnavailableDates, currentDate]);
+                              }
+                            }}
+                            className={`
+                              aspect-square p-1 text-sm border rounded-md transition-all
+                              ${isSelected 
+                                ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' 
+                                : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'
+                              }
+                              ${isWeekend ? 'bg-muted/30' : ''}
+                              ${status === 'submitted' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
+                            `}
+                          >
+                            <div className="flex flex-col items-center justify-center h-full">
+                              <span className="font-medium">{format(currentDate, 'd')}</span>
+                              <span className="text-xs opacity-75">{format(currentDate, 'MMM')}</span>
+                            </div>
+                          </button>
+                        );
+                      }
+                    }
+                    
+                    return dates;
+                  })()}
+                </div>
+
+                {/* Legend */}
+                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mt-4 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-muted/30 border rounded"></div>
+                    <span>Weekend</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-destructive border rounded"></div>
+                    <span>Unavailable</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-background border rounded"></div>
+                    <span>Available</span>
+                  </div>
+                </div>
+              </div>
               {selectedUnavailableDates.length > 0 && (
                 <div className="mt-4">
                   <Label className="text-sm font-medium">Selected Unavailable Dates:</Label>
