@@ -28,33 +28,37 @@ const getHolidays = (year: number) => {
   const holidays = [];
   
   // Fixed holidays
-  holidays.push(new Date(year, 0, 1)); // New Year's Day
-  holidays.push(new Date(year, 6, 4)); // Independence Day
-  holidays.push(new Date(year, 10, 11)); // Veterans Day
-  holidays.push(new Date(year, 11, 25)); // Christmas Day
+  holidays.push({ date: new Date(year, 0, 1), name: "New Year's Day" });
+  holidays.push({ date: new Date(year, 6, 4), name: "Independence Day" });
+  holidays.push({ date: new Date(year, 10, 11), name: "Veterans Day" });
+  holidays.push({ date: new Date(year, 11, 25), name: "Christmas Day" });
   
   // Memorial Day (last Monday in May)
   const memorialDay = new Date(year, 4, 31);
   memorialDay.setDate(31 - memorialDay.getDay());
-  holidays.push(memorialDay);
+  holidays.push({ date: memorialDay, name: "Memorial Day" });
   
   // Labor Day (first Monday in September)
   const laborDay = new Date(year, 8, 1);
   laborDay.setDate(1 + (7 - laborDay.getDay()) % 7);
-  holidays.push(laborDay);
+  holidays.push({ date: laborDay, name: "Labor Day" });
   
   // Thanksgiving (fourth Thursday in November)
   const thanksgiving = new Date(year, 10, 1);
   thanksgiving.setDate(1 + (4 - thanksgiving.getDay() + 7) % 7 + 21);
-  holidays.push(thanksgiving);
+  holidays.push({ date: thanksgiving, name: "Thanksgiving" });
   
   return holidays;
 };
 
-const isHoliday = (date: Date) => {
+const getHolidayInfo = (date: Date) => {
   const year = getYear(date);
   const holidays = getHolidays(year);
-  return holidays.some(holiday => isSameDay(holiday, date));
+  return holidays.find(holiday => isSameDay(holiday.date, date));
+};
+
+const isHoliday = (date: Date) => {
+  return !!getHolidayInfo(date);
 };
 
 const DoctorPortal = () => {
@@ -396,13 +400,15 @@ const DoctorPortal = () => {
                         const isSelected = selectedUnavailableDates.some(
                           selectedDate => format(selectedDate, 'yyyy-MM-dd') === dateString
                         );
-                        const isHolidayDate = isHoliday(currentDate);
+                        const holidayInfo = getHolidayInfo(currentDate);
+                        const isHolidayDate = !!holidayInfo;
 
                         dates.push(
                           <button
                             key={dateString}
                             type="button"
                             disabled={status === 'submitted'}
+                            title={holidayInfo ? holidayInfo.name : undefined}
                             onClick={() => {
                               if (isSelected) {
                                 // Remove date
