@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import ScheduleVisualization from "@/components/ScheduleVisualization";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 const AdminDashboard = () => {
   const [blockLocked, setBlockLocked] = useState(false);
@@ -57,7 +58,8 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <ProtectedRoute requireAdmin={true}>
+      <div className="min-h-screen bg-background p-4">
       <div className="container mx-auto max-w-7xl">
         {/* Header */}
         <div className="mb-8">
@@ -299,7 +301,8 @@ const AdminDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 };
 

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 const DoctorPortal = () => {
   const [selectedUnavailableDates, setSelectedUnavailableDates] = useState<string[]>([]);
@@ -60,7 +61,8 @@ const DoctorPortal = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <ProtectedRoute>
+      <div className="min-h-screen bg-background p-4">
       <div className="container mx-auto max-w-4xl">
         {/* Header */}
         <div className="mb-8">
@@ -212,8 +214,9 @@ const DoctorPortal = () => {
             Submit Preferences
           </Button>
         </div>
+        </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 };
 
