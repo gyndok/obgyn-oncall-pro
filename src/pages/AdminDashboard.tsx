@@ -750,6 +750,59 @@ const AdminDashboard = () => {
           <TabsContent value="overview" className="space-y-6">
             {currentBlock ? (
               <>
+                {/* Submission Progress Alert */}
+                {(() => {
+                  const activeDoctors = doctors.filter(d => d.active);
+                  const submittedCount = activeDoctors.filter(doctor => {
+                    const request = doctorRequests.find(req => req.doctor_id === doctor.id);
+                    return request && request.status === 'submitted';
+                  }).length;
+                  const totalDoctors = activeDoctors.length;
+                  const allSubmitted = submittedCount === totalDoctors && totalDoctors > 0;
+
+                  return (
+                    <Alert className={cn(
+                      "mb-6",
+                      allSubmitted ? "border-success bg-success/10" : "border-warning bg-warning/10"
+                    )}>
+                      <div className="flex items-center gap-3">
+                        {allSubmitted ? (
+                          <CheckCircle className="h-5 w-5 text-success" />
+                        ) : (
+                          <Clock className="h-5 w-5 text-warning" />
+                        )}
+                        <div className="flex-1">
+                          <div className="font-semibold">
+                            {allSubmitted 
+                              ? "🎉 All Doctors Have Submitted!" 
+                              : `Waiting for ${totalDoctors - submittedCount} more submission${totalDoctors - submittedCount !== 1 ? 's' : ''}`
+                            }
+                          </div>
+                          <AlertDescription className="mt-1">
+                            {allSubmitted
+                              ? "All active doctors have submitted their preferences. You can now generate the schedule."
+                              : `${submittedCount} of ${totalDoctors} doctors have submitted their requests.`
+                            }
+                          </AlertDescription>
+                        </div>
+                        {allSubmitted && (
+                          <Button 
+                            className="bg-success hover:bg-success/90 text-success-foreground"
+                            onClick={() => {
+                              toast({
+                                title: "Ready to Generate Schedule",
+                                description: "All doctors have submitted. You can now create the final schedule.",
+                              });
+                            }}
+                          >
+                            Generate Schedule
+                          </Button>
+                        )}
+                      </div>
+                    </Alert>
+                  );
+                })()}
+
                 {/* Stats Cards */}
                 <div className="grid md:grid-cols-4 gap-4">
                   <Card className="bg-gradient-card shadow-soft">
