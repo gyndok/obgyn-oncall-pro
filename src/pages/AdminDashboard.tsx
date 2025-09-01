@@ -58,7 +58,6 @@ const AdminDashboard = () => {
   const [doctors, setDoctors] = useState<any[]>([]);
   const [doctorRequests, setDoctorRequests] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
-  const [doctorAuthStatus, setDoctorAuthStatus] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -108,11 +107,6 @@ const AdminDashboard = () => {
       if (doctorsError) throw doctorsError;
       setDoctors(doctorsData || []);
 
-      // Check auth status for each doctor
-      if (doctorsData) {
-        await checkDoctorAuthStatus(doctorsData);
-      }
-
       if (activeBlock) {
         // Fetch doctor requests for CURRENT active block only (not old completed blocks)
         const { data: requestsData, error: requestsError } = await supabase
@@ -148,23 +142,6 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const checkDoctorAuthStatus = async (doctorsData: any[]) => {
-    const statusMap: Record<string, boolean> = {};
-    
-    for (const doctor of doctorsData) {
-      try {
-        // Try to get user data from auth - if user exists, they have set up auth
-        const { data, error } = await supabase.auth.admin.getUserById(doctor.id);
-        statusMap[doctor.email] = !error && data.user !== null;
-      } catch (error) {
-        // If we can't check (permissions issue), assume they haven't set up auth
-        statusMap[doctor.email] = false;
-      }
-    }
-    
-    setDoctorAuthStatus(statusMap);
   };
 
   const createNewBlock = async () => {
@@ -1036,7 +1013,6 @@ const AdminDashboard = () => {
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Auth Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1049,11 +1025,6 @@ const AdminDashboard = () => {
                         <TableCell>
                           <Badge variant={doctor.active ? "default" : "secondary"}>
                             {doctor.active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={doctorAuthStatus[doctor.email] ? "default" : "destructive"}>
-                            {doctorAuthStatus[doctor.email] ? 'Password Set' : 'No Password'}
                           </Badge>
                         </TableCell>
                         <TableCell>
