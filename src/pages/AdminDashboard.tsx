@@ -63,6 +63,11 @@ const AdminDashboard = () => {
   const [editStartDate, setEditStartDate] = useState<Date | undefined>();
   const [editEndDate, setEditEndDate] = useState<Date | undefined>();
 
+  // Doctor management state
+  const [showDoctorDialog, setShowDoctorDialog] = useState(false);
+  const [editingDoctor, setEditingDoctor] = useState<any>(null);
+  const [doctorForm, setDoctorForm] = useState({ name: "", email: "", mobile: "" });
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -86,7 +91,6 @@ const AdminDashboard = () => {
       const { data: doctorsData, error: doctorsError } = await supabase
         .from('doctors')
         .select('*')
-        .eq('active', true)
         .order('name');
 
       if (doctorsError) throw doctorsError;
@@ -338,6 +342,127 @@ const AdminDashboard = () => {
     }
   };
 
+  // Doctor management functions
+  const fetchAllDoctors = async () => {
+    const { data, error } = await supabase
+      .from('doctors')
+      .select('*')
+      .order('name');
+
+    if (error) {
+      console.error('Error fetching all doctors:', error);
+      return [];
+    }
+    return data || [];
+  };
+
+  const openDoctorDialog = (doctor = null) => {
+    if (doctor) {
+      setEditingDoctor(doctor);
+      setDoctorForm({ name: doctor.name, email: doctor.email, mobile: doctor.mobile || "" });
+    } else {
+      setEditingDoctor(null);
+      setDoctorForm({ name: "", email: "", mobile: "" });
+    }
+    setShowDoctorDialog(true);
+  };
+
+  const closeDoctorDialog = () => {
+    setShowDoctorDialog(false);
+    setEditingDoctor(null);
+    setDoctorForm({ name: "", email: "", mobile: "" });
+  };
+
+  const saveDoctor = async () => {
+    if (!doctorForm.name.trim() || !doctorForm.email.trim()) {
+      toast({
+        title: "Error",
+        description: "Name and email are required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (editingDoctor) {
+        // Update existing doctor
+        const { error } = await supabase
+          .from('doctors')
+          .update({
+            name: doctorForm.name.trim(),
+            email: doctorForm.email.trim(),
+            mobile: doctorForm.mobile.trim() || null
+          })
+          .eq('id', editingDoctor.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Doctor updated successfully",
+        });
+      } else {
+        // Create new doctor
+        const { error } = await supabase
+          .from('doctors')
+          .insert({
+            name: doctorForm.name.trim(),
+            email: doctorForm.email.trim(),
+            mobile: doctorForm.mobile.trim() || null,
+            active: true
+          });
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Doctor added successfully",
+        });
+      }
+
+      closeDoctorDialog();
+      fetchData();
+    } catch (error) {
+      console.error('Error saving doctor:', error);
+      toast({
+        title: "Error",
+        description: error.message.includes('duplicate') ? "Email already exists" : "Failed to save doctor",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleDoctorActive = async (doctor: any) => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('doctors')
+        .update({ active: !doctor.active })
+        .eq('id', doctor.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Doctor ${doctor.active ? 'deactivated' : 'activated'} successfully`,
+      });
+
+      fetchData();
+    } catch (error) {
+      console.error('Error updating doctor status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update doctor status",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Calculate submission stats
   const submissionStats = React.useMemo(() => {
     if (!doctors.length || !Array.isArray(doctorRequests)) {
@@ -451,10 +576,11 @@ const AdminDashboard = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full lg:w-fit grid-cols-4 lg:grid-cols-4">
+          <TabsList className="grid w-full lg:w-fit grid-cols-5 lg:grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="configure">Configure</TabsTrigger>
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
+            <TabsTrigger value="doctors">Doctors</TabsTrigger>
             <TabsTrigger value="publish">Publish</TabsTrigger>
           </TabsList>
 
@@ -760,6 +886,123 @@ const AdminDashboard = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Doctors Tab */}
+          <TabsContent value="doctors" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Doctor Management</h2>
+                <p className="text-muted-foreground">Manage doctor profiles and permissions</p>
+              </div>
+              <Button onClick={() => openDoctorDialog()} className="bg-gradient-primary hover:opacity-90">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Doctor
+              </Button>
+            </div>
+
+            <Card className="shadow-soft">
+              <CardHeader>
+                <CardTitle>All Doctors</CardTitle>
+                <CardDescription>Manage doctor accounts and permissions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {doctors.map((doctor) => (
+                      <TableRow key={doctor.id}>
+                        <TableCell className="font-medium">{doctor.name}</TableCell>
+                        <TableCell>{doctor.email}</TableCell>
+                        <TableCell>{doctor.mobile || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant={doctor.active ? "default" : "secondary"}>
+                            {doctor.active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openDoctorDialog(doctor)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toggleDoctorActive(doctor)}
+                              disabled={saving}
+                            >
+                              {doctor.active ? <X className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            {/* Doctor Dialog */}
+            <Dialog open={showDoctorDialog} onOpenChange={setShowDoctorDialog}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{editingDoctor ? 'Edit Doctor' : 'Add New Doctor'}</DialogTitle>
+                  <DialogDescription>
+                    {editingDoctor ? 'Update doctor information' : 'Add a new doctor to the system'}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div>
+                    <Label htmlFor="doctor-name">Name</Label>
+                    <Input 
+                      id="doctor-name" 
+                      value={doctorForm.name}
+                      onChange={(e) => setDoctorForm({...doctorForm, name: e.target.value})}
+                      placeholder="Enter doctor's full name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="doctor-email">Email</Label>
+                    <Input 
+                      id="doctor-email" 
+                      type="email"
+                      value={doctorForm.email}
+                      onChange={(e) => setDoctorForm({...doctorForm, email: e.target.value})}
+                      placeholder="doctor@example.com"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="doctor-mobile">Phone Number</Label>
+                    <Input 
+                      id="doctor-mobile" 
+                      value={doctorForm.mobile}
+                      onChange={(e) => setDoctorForm({...doctorForm, mobile: e.target.value})}
+                      placeholder="+1 (555) 123-4567"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={closeDoctorDialog}>
+                    Cancel
+                  </Button>
+                  <Button onClick={saveDoctor} disabled={saving}>
+                    {saving ? "Saving..." : (editingDoctor ? "Update" : "Add")} Doctor
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Publish Tab */}
