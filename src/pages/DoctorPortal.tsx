@@ -712,7 +712,7 @@ const DoctorPortal = () => {
                   size="lg" 
                   onClick={handleSaveDraft}
                   disabled={!canEdit || saving}
-                  className="w-full sm:flex-1 sm:flex-none"
+                  className="w-full sm:w-auto"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? "Saving..." : "Save Draft"}
