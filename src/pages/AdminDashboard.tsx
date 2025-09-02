@@ -569,7 +569,15 @@ const AdminDashboard = () => {
   };
 
   const handleSendReminders = () => {
-    if (!currentBlock) return;
+    console.log('handleSendReminders called');
+    console.log('currentBlock:', currentBlock);
+    console.log('doctors:', doctors);
+    console.log('doctorRequests:', doctorRequests);
+    
+    if (!currentBlock) {
+      console.log('No current block, returning early');
+      return;
+    }
     
     // Find doctors who haven't submitted requests
     const nonSubmitters = doctors.filter(doctor => {
@@ -577,7 +585,10 @@ const AdminDashboard = () => {
       return !request || request.status === 'not_started';
     }).filter(doctor => doctor.active); // Only include active doctors
     
+    console.log('nonSubmitters:', nonSubmitters);
+    
     if (nonSubmitters.length === 0) {
+      console.log('No reminders needed');
       toast({
         title: "No Reminders Needed",
         description: "All active doctors have already submitted their requests.",
@@ -612,6 +623,7 @@ Best regards,
 Call Schedule Coordinator`);
     
     const mailtoLink = `mailto:${recipientEmails}?subject=${subject}&body=${body}`;
+    console.log('Opening mailto link:', mailtoLink);
     window.open(mailtoLink, '_self');
   };
 
