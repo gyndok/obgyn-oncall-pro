@@ -569,15 +569,7 @@ const AdminDashboard = () => {
   };
 
   const handleSendReminders = () => {
-    console.log('handleSendReminders called');
-    console.log('currentBlock:', currentBlock);
-    console.log('doctors:', doctors);
-    console.log('doctorRequests:', doctorRequests);
-    
-    if (!currentBlock) {
-      console.log('No current block, returning early');
-      return;
-    }
+    if (!currentBlock) return;
     
     // Find doctors who haven't submitted requests
     const nonSubmitters = doctors.filter(doctor => {
@@ -585,10 +577,7 @@ const AdminDashboard = () => {
       return !request || request.status === 'not_started';
     }).filter(doctor => doctor.active); // Only include active doctors
     
-    console.log('nonSubmitters:', nonSubmitters);
-    
     if (nonSubmitters.length === 0) {
-      console.log('No reminders needed');
       toast({
         title: "No Reminders Needed",
         description: "All active doctors have already submitted their requests.",
@@ -600,8 +589,8 @@ const AdminDashboard = () => {
     const blockDates = `${format(parseLocalDate(currentBlock.start_monday_date), 'MMMM d')} - ${format(parseLocalDate(currentBlock.end_sunday_date), 'MMMM d, yyyy')}`;
     const deadlineText = currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMMM d, yyyy') : 'soon';
     
-    const subject = encodeURIComponent(`Reminder: Call Schedule Preferences Needed - ${blockDates}`);
-    const body = encodeURIComponent(`Dear Colleague,
+    const subject = `Reminder: Call Schedule Preferences Needed - ${blockDates}`;
+    const body = `Dear Colleague,
 
 This is a friendly reminder that we need your call schedule preferences for the upcoming call block:
 
@@ -620,11 +609,51 @@ If you have any questions or technical difficulties, please don't hesitate to re
 Thank you for your prompt attention to this matter.
 
 Best regards,
-Call Schedule Coordinator`);
+Call Schedule Coordinator`;
     
-    const mailtoLink = `mailto:${recipientEmails}?subject=${subject}&body=${body}`;
-    console.log('Opening mailto link:', mailtoLink);
-    window.open(mailtoLink, '_self');
+    // Show success message with details
+    toast({
+      title: `Reminder Email Ready`,
+      description: `Found ${nonSubmitters.length} doctors who need reminders: ${nonSubmitters.map(d => d.name).join(', ')}`,
+    });
+    
+    // Try to open email client
+    const mailtoLink = `mailto:${recipientEmails}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    // Attempt to open mailto, with fallback
+    try {
+      window.open(mailtoLink, '_self');
+      
+      // Show fallback info after a brief delay if email client doesn't open
+      setTimeout(() => {
+        if (confirm(`Did your email client open? If not, click OK to copy the email details.`)) {
+          navigator.clipboard.writeText(`TO: ${recipientEmails}
+SUBJECT: ${subject}
+
+${body}`).then(() => {
+            toast({
+              title: "Email Details Copied",
+              description: "The email content has been copied to your clipboard.",
+            });
+          }).catch(() => {
+            alert(`Email details:
+
+TO: ${recipientEmails}
+SUBJECT: ${subject}
+
+${body}`);
+          });
+        }
+      }, 3000);
+    } catch (error) {
+      console.error('Failed to open mailto:', error);
+      alert(`Email client failed to open. Here are the details:
+
+TO: ${recipientEmails}
+SUBJECT: ${subject}
+
+${body}`);
+    }
   };
 
   // Edit request functions
