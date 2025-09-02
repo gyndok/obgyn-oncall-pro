@@ -304,24 +304,53 @@ const AdminDashboard = () => {
     // Get submitted requests
     const submittedRequests = doctorRequests.filter(req => req.status === 'submitted');
     
-    let prompt = `You are a medical call scheduling AI. Please create an optimal 7-week call schedule with the following constraints:
+    let prompt = `**Role:** You are a medical call-scheduling AI. Generate an optimal 7-week on-call schedule for 7 doctors.
 
-**SCHEDULE PERIOD:**
-- Start Date: ${format(blockStart, 'EEEE, MMMM d, yyyy')}
-- End Date: ${format(blockEnd, 'EEEE, MMMM d, yyyy')}
-- Duration: 7 weeks (49 days total)
+**Schedule Period**
 
-**DOCTORS AVAILABLE:**`;
-    
-    doctors.filter(d => d.active).forEach(doctor => {
-      prompt += `\n- ${doctor.name} (${doctor.email})`;
-    });
+* Start: ${format(blockStart, 'yyyy-MM-dd')} (a Monday)
+* Duration: 7 weeks (Mon–Sun weeks; 49 consecutive days)
 
-    prompt += `\n\n**DOCTOR PREFERENCES & CONSTRAINTS:**`;
+**Doctors (exactly 7)**
+
+* Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson
+
+  * Standing constraint: **LeBlanc may never be scheduled on a Tuesday.**
+
+**Hard Constraints (must never be violated)**
+
+1. **Coverage:** Exactly **one** doctor assigned per calendar day.
+2. **Weekend bundle per doctor:** Each doctor is assigned **exactly one** full weekend bundle in the block (Fri+Sat+Sun of the same week).
+3. **No adjacency around a doctor's weekend:** For any doctor's Fri+Sat+Sun bundle:
+
+   * That doctor **cannot** be assigned the **Thursday immediately before** it.
+   * That doctor **cannot** be assigned the **Monday immediately after** it.
+4. **Weekday totals:** Across the 7 weeks, each doctor is assigned **exactly 4 weekdays** from **Monday–Thursday** (no Fri/Sat/Sun count toward this).
+5. **Max one weekday per week per doctor:** For every doctor, in each week, at most **one** of Mon–Thu may be assigned to that doctor.
+6. **Doctor-specific rule:** **LeBlanc** is assigned **0 Tuesdays** across the entire block.
+7. **Time-off / Unavailability:** Any date listed as unavailable for a doctor is a **hard exclude** for that doctor.
+8. **Date bounds:** Do not assign outside the 49-day window.
+
+**Soft Constraints (optimize these after satisfying all hard constraints)**
+A) **Honor preferred weekend(s):** If a doctor listed preferred weekend bundles, assign them when feasible.
+B) **Fairness / Smoothness:** Spread each doctor's 4 Mon–Thu days across the block to avoid front-loading or back-loading (aim for at least one weekday in early weeks and one in late weeks when feasible).
+C) **Even distribution per week:** Avoid stacking many different doctors' weekdays into the same one or two weeks if alternatives exist.
+
+**Optimization Objective (lexicographic preference)**
+
+1. Minimize the number of **preferred-weekend violations** (doctor has a preferred weekend but receives a different one).
+2. Minimize **weekday distribution imbalance** per doctor across the 7 weeks (avoid clustering all 4 weekdays into the same small window).
+3. Minimize minor aesthetic issues (e.g., avoid same doctor on back-to-back weekdays across week boundaries when alternatives exist).
+
+**Input You Will Receive**
+
+* Block start Monday date: ${format(blockStart, 'yyyy-MM-dd')}
+* Per-doctor: unavailable dates (hard), preferred weekend indices (soft), optional notes.`;
     
     if (submittedRequests.length === 0) {
-      prompt += `\nNo specific preferences submitted yet. Use fair rotation.`;
+      prompt += `\n\nNo doctor preferences have been submitted yet. Use default fair distribution.`;
     } else {
+      prompt += `\n\n**Doctor Preferences & Constraints:**`;
       submittedRequests.forEach(request => {
         const doctor = doctors.find(d => d.id === request.doctor_id);
         if (doctor) {
@@ -329,42 +358,97 @@ const AdminDashboard = () => {
           
           if (request.unavailable_dates && request.unavailable_dates.length > 0) {
             const unavailableDates = request.unavailable_dates.map(dateStr => 
-              format(parseLocalDate(dateStr), 'MMM d, yyyy')
+              format(parseLocalDate(dateStr), 'yyyy-MM-dd')
             ).join(', ');
-            prompt += `\n- UNAVAILABLE: ${unavailableDates}`;
+            prompt += `\n- Unavailable dates (hard): ${unavailableDates}`;
           }
           
           if (request.preferred_weekends && request.preferred_weekends.length > 0) {
-            const preferredWeekends = request.preferred_weekends.map(w => `Week ${w}`).join(', ');
-            prompt += `\n- PREFERS WEEKENDS: ${preferredWeekends}`;
+            const preferredWeekends = request.preferred_weekends.join(', ');
+            prompt += `\n- Preferred weekend indices (soft): ${preferredWeekends}`;
           }
           
           if (request.notes && request.notes.trim()) {
-            prompt += `\n- NOTES: ${request.notes}`;
+            prompt += `\n- Notes: ${request.notes}`;
           }
         }
       });
     }
 
-    prompt += `\n\n**SCHEDULING REQUIREMENTS:**
-1. Each doctor should have roughly equal call distribution
-2. Weekend shifts (Friday-Sunday) are critical and should be prioritized
-3. Avoid consecutive weekend assignments for the same doctor when possible
-4. Respect all unavailable dates as hard constraints
-5. Consider weekend preferences but balance fairness
-6. Ensure no doctor is assigned during their unavailable dates
+    prompt += `
 
-**OUTPUT FORMAT:**
-Please provide a day-by-day assignment in this format:
-- Monday, [Date]: Dr. [Name]
-- Tuesday, [Date]: Dr. [Name]
-... etc for all 49 days
+**Output Requirements**
+Provide both human-readable and machine-readable outputs.
 
-**OPTIMIZATION GOALS:**
-- Minimize total preference violations
-- Maximize weekend coverage by doctors who prefer weekends
-- Ensure fair distribution of workload
-- Consider work-life balance by avoiding excessive consecutive assignments`;
+1. **Readable schedule (by week):**
+
+   * Week N (Mon–Sun with dates):
+     Mon, YYYY-MM-DD — {Doctor}
+     Tue, YYYY-MM-DD — {Doctor}
+     Wed, YYYY-MM-DD — {Doctor}
+     Thu, YYYY-MM-DD — {Doctor}
+     Fri, YYYY-MM-DD — {Doctor}  (Weekend Bundle if Fri)
+     Sat, YYYY-MM-DD — {Doctor}  (Weekend Bundle if Sat)
+     Sun, YYYY-MM-DD — {Doctor}  (Weekend Bundle if Sun)
+
+2. **Per-doctor summary:**
+
+   * {Doctor}: Weekend = Week # (Fri/Sat/Sun dates), Weekdays = [Week#/Day, …] (total must equal 4)
+
+3. **JSON payload (strict schema):**
+
+\`\`\`json
+{
+  "block": {
+    "start_monday": "${format(blockStart, 'yyyy-MM-dd')}",
+    "end_sunday": "${format(blockEnd, 'yyyy-MM-dd')}"
+  },
+  "assignments": [
+    {"date": "YYYY-MM-DD", "weekday": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "doctor": "Klein|LeBlanc|Johnson|Kenney|LaBerge|Clinger|Demerson", "is_weekend": true|false, "week_index": 1}
+    // 49 records total
+  ],
+  "doctor_summaries": [
+    {"doctor": "Klein", "weekend_week_index": 3, "weekend_dates": ["YYYY-MM-DD","YYYY-MM-DD","YYYY-MM-DD"], "weekday_dates": ["YYYY-MM-DD", "YYYY-MM-DD", "YYYY-MM-DD", "YYYY-MM-DD"]}
+    // one per doctor
+  ],
+  "validation": {
+    "hard_constraints_passed": true,
+    "errors": []
+  }
+}
+\`\`\`
+
+**Validator (run before returning output)**
+Confirm all of the following are true; otherwise set \`hard_constraints_passed=false\` and list each violation in \`errors\`:
+
+* Every date in the 49-day range is assigned exactly once.
+* For each doctor:
+
+  * Exactly **one** Fri+Sat+Sun bundle (same week).
+  * **Zero** assignment on the Thu immediately before their weekend.
+  * **Zero** assignment on the Mon immediately after their weekend.
+  * Exactly **4** total assignments among Mon–Thu across the full block.
+  * In each week, **≤1** assignment among Mon–Thu.
+* For LeBlanc: **0** Tuesday assignments.
+* No assignment occurs on a date marked unavailable for that doctor.
+
+**Tie-Breakers (if multiple optimal solutions)**
+
+1. Prefer giving each doctor one weekday in the first 3 weeks **and** one weekday in the last 3 weeks when possible.
+2. Prefer distributing Tuesday assignments evenly among the doctors who can take Tuesday (never LeBlanc).
+3. Prefer that a doctor's weekend be as close as possible to their preferred weekend if an exact match isn't feasible.
+4. If still tied, choose the lexicographically smallest schedule by (week, day, doctor name).
+
+**Failure / Infeasibility Behavior**
+
+* If infeasible under the hard constraints, do **not** relax them.
+* Return an **Infeasibility Report** listing the minimal conflicting elements (e.g., too many Tuesday unavailabilities combined with the LeBlanc Tuesday ban, dense time-off near all weekends). Include the smallest set of **soft** preference relaxations that would restore feasibility (never relax hard rules).
+
+**Formatting Notes**
+
+* Use the exact doctor names above in all outputs.
+* Use ISO dates (YYYY-MM-DD).
+* Week indices are 1–7 where Week 1 is the start week.`;
 
     return prompt;
   };
