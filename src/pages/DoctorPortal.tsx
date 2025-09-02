@@ -610,7 +610,7 @@ const DoctorPortal = () => {
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? "Saving..." : "Save Draft"}
                 </Button>
-                <Button size="lg" onClick={handleSubmit} disabled={!canEdit || saving} className="w-full sm:flex-1 sm:flex-none bg-gradient-primary hover:opacity-90">
+                <Button size="sm" onClick={handleSubmit} disabled={!canEdit || saving} className="w-auto bg-gradient-primary hover:opacity-90">
                   <Send className="h-4 w-4 mr-2" />
                   {saving ? "Submitting..." : isSubmitted ? "Update Submission" : "Submit Preferences"}
                 </Button>
