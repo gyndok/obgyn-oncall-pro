@@ -575,85 +575,85 @@ const AdminDashboard = () => {
     const nonSubmitters = doctors.filter(doctor => {
       const request = doctorRequests.find(req => req.doctor_id === doctor.id && req.block_id === currentBlock.id);
       return !request || request.status === 'not_started';
-    }).filter(doctor => doctor.active); // Only include active doctors
+    }).filter(doctor => doctor.active && doctor.mobile); // Only include active doctors with mobile numbers
     
     if (nonSubmitters.length === 0) {
       toast({
         title: "No Reminders Needed",
-        description: "All active doctors have already submitted their requests.",
+        description: "All active doctors with mobile numbers have already submitted their requests.",
       });
       return;
     }
     
-    const recipientEmails = nonSubmitters.map(doctor => doctor.email).join(',');
     const blockDates = `${format(parseLocalDate(currentBlock.start_monday_date), 'MMMM d')} - ${format(parseLocalDate(currentBlock.end_sunday_date), 'MMMM d, yyyy')}`;
     const deadlineText = currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMMM d, yyyy') : 'soon';
     
-    const subject = `Reminder: Call Schedule Preferences Needed - ${blockDates}`;
-    const body = `Dear Colleague,
+    const message = `Hi! This is a friendly reminder that we need your call schedule preferences for the upcoming call block:
 
-This is a friendly reminder that we need your call schedule preferences for the upcoming call block:
-
-Call Block Dates: ${blockDates}
-Submission Deadline: ${deadlineText}
+📅 Call Block Dates: ${blockDates}
+⏰ Submission Deadline: ${deadlineText}
 
 Please log into the call scheduling system to submit:
 • Your unavailable dates
-• Your preferred weekend call preferences
+• Your preferred weekend call preferences  
 • Any additional notes or special requests
 
 Your input is essential for creating a fair and balanced call schedule for everyone.
 
 If you have any questions or technical difficulties, please don't hesitate to reach out.
 
-Thank you for your prompt attention to this matter.
+Thank you!`;
 
-Best regards,
-Call Schedule Coordinator`;
-    
-    // Show success message with details
-    toast({
-      title: `Reminder Email Ready`,
-      description: `Found ${nonSubmitters.length} doctors who need reminders: ${nonSubmitters.map(d => d.name).join(', ')}`,
+    // Format phone number for WhatsApp (remove non-digits, ensure it starts with country code)
+    const formatPhoneForWhatsApp = (phone: string) => {
+      // Remove all non-digit characters
+      const digits = phone.replace(/\D/g, '');
+      // If it starts with 1 and is 11 digits, it's already formatted for US
+      if (digits.startsWith('1') && digits.length === 11) {
+        return digits;
+      }
+      // If it's 10 digits, add US country code
+      if (digits.length === 10) {
+        return '1' + digits;
+      }
+      return digits; // Return as-is if different format
+    };
+
+    // Generate WhatsApp links for each doctor
+    const whatsappLinks = nonSubmitters.map(doctor => {
+      const formattedPhone = formatPhoneForWhatsApp(doctor.mobile);
+      const encodedMessage = encodeURIComponent(message);
+      return {
+        doctor: doctor.name,
+        phone: doctor.mobile,
+        link: `https://wa.me/${formattedPhone}?text=${encodedMessage}`
+      };
     });
-    
-    // Try to open email client
-    const mailtoLink = `mailto:${recipientEmails}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
-    // Attempt to open mailto, with fallback
-    try {
-      window.open(mailtoLink, '_self');
-      
-      // Show fallback info after a brief delay if email client doesn't open
+
+    // Show success message
+    toast({
+      title: `WhatsApp Reminders Ready`,
+      description: `Opening WhatsApp for ${nonSubmitters.length} doctors: ${nonSubmitters.map(d => d.name).join(', ')}`,
+    });
+
+    // Open WhatsApp links with delay between each to avoid overwhelming the browser
+    whatsappLinks.forEach((item, index) => {
       setTimeout(() => {
-        if (confirm(`Did your email client open? If not, click OK to copy the email details.`)) {
-          navigator.clipboard.writeText(`TO: ${recipientEmails}
-SUBJECT: ${subject}
+        console.log(`Opening WhatsApp for ${item.doctor} (${item.phone})`);
+        window.open(item.link, '_blank');
+      }, index * 1000); // 1 second delay between each link
+    });
 
-${body}`).then(() => {
-            toast({
-              title: "Email Details Copied",
-              description: "The email content has been copied to your clipboard.",
-            });
-          }).catch(() => {
-            alert(`Email details:
-
-TO: ${recipientEmails}
-SUBJECT: ${subject}
-
-${body}`);
-          });
-        }
-      }, 3000);
-    } catch (error) {
-      console.error('Failed to open mailto:', error);
-      alert(`Email client failed to open. Here are the details:
-
-TO: ${recipientEmails}
-SUBJECT: ${subject}
-
-${body}`);
-    }
+    // Also show a summary in case some links don't open
+    setTimeout(() => {
+      const summary = whatsappLinks.map(item => 
+        `${item.doctor} (${item.phone}): ${item.link}`
+      ).join('\n\n');
+      
+      if (confirm(`${whatsappLinks.length} WhatsApp windows should have opened. If any didn't open, click OK to see the links.`)) {
+        alert(`WhatsApp Links:\n\n${summary}`);
+      }
+    }, whatsappLinks.length * 1000 + 2000);
   };
 
   // Edit request functions
