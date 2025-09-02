@@ -569,7 +569,18 @@ const AdminDashboard = () => {
   };
 
   const handleSendReminders = () => {
-    if (!currentBlock) return;
+    console.log('🟢 handleSendReminders called');
+    
+    if (!currentBlock) {
+      console.log('❌ No current block');
+      return;
+    }
+    
+    console.log('📊 Current data:', { 
+      doctorsCount: doctors.length, 
+      requestsCount: doctorRequests.length,
+      currentBlockId: currentBlock.id 
+    });
     
     // Find doctors who haven't submitted requests
     const nonSubmitters = doctors.filter(doctor => {
@@ -577,7 +588,10 @@ const AdminDashboard = () => {
       return !request || request.status === 'not_started';
     }).filter(doctor => doctor.active && doctor.mobile); // Only include active doctors with mobile numbers
     
+    console.log('📱 Non-submitters with mobile:', nonSubmitters.map(d => ({ name: d.name, mobile: d.mobile })));
+    
     if (nonSubmitters.length === 0) {
+      console.log('⚠️ No reminders needed');
       toast({
         title: "No Reminders Needed",
         description: "All active doctors with mobile numbers have already submitted their requests.",
@@ -606,8 +620,10 @@ Thank you!`;
 
     // Format phone number for WhatsApp (remove non-digits, ensure it starts with country code)
     const formatPhoneForWhatsApp = (phone: string) => {
+      console.log('📞 Formatting phone:', phone);
       // Remove all non-digit characters
       const digits = phone.replace(/\D/g, '');
+      console.log('📞 Digits only:', digits);
       // If it starts with 1 and is 11 digits, it's already formatted for US
       if (digits.startsWith('1') && digits.length === 11) {
         return digits;
@@ -623,10 +639,12 @@ Thank you!`;
     const whatsappLinks = nonSubmitters.map(doctor => {
       const formattedPhone = formatPhoneForWhatsApp(doctor.mobile);
       const encodedMessage = encodeURIComponent(message);
+      const link = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+      console.log(`🔗 WhatsApp link for ${doctor.name}:`, link);
       return {
         doctor: doctor.name,
         phone: doctor.mobile,
-        link: `https://wa.me/${formattedPhone}?text=${encodedMessage}`
+        link: link
       };
     });
 
@@ -636,10 +654,13 @@ Thank you!`;
       description: `Opening WhatsApp for ${nonSubmitters.length} doctors: ${nonSubmitters.map(d => d.name).join(', ')}`,
     });
 
+    console.log('🚀 About to open WhatsApp links:', whatsappLinks.length);
+
     // Open WhatsApp links with delay between each to avoid overwhelming the browser
     whatsappLinks.forEach((item, index) => {
       setTimeout(() => {
-        console.log(`Opening WhatsApp for ${item.doctor} (${item.phone})`);
+        console.log(`📱 Opening WhatsApp for ${item.doctor} (${item.phone})`);
+        console.log(`🔗 Link: ${item.link}`);
         window.open(item.link, '_blank');
       }, index * 1000); // 1 second delay between each link
     });
@@ -651,6 +672,7 @@ Thank you!`;
       ).join('\n\n');
       
       if (confirm(`${whatsappLinks.length} WhatsApp windows should have opened. If any didn't open, click OK to see the links.`)) {
+        console.log('📋 Showing summary to user');
         alert(`WhatsApp Links:\n\n${summary}`);
       }
     }, whatsappLinks.length * 1000 + 2000);
