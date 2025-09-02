@@ -96,6 +96,9 @@ const AdminDashboard = () => {
   const [publishStatus, setPublishStatus] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const [lastPublishResult, setLastPublishResult] = useState<any>(null);
 
+  // Never submitted tracking state
+  const [neverSubmittedDoctors, setNeverSubmittedDoctors] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -407,10 +410,12 @@ C) **Even distribution per week:** Avoid stacking many different doctors' weekda
 * Block start Monday date: ${format(blockStart, 'yyyy-MM-dd')}
 * Per-doctor: unavailable dates (hard), preferred weekend indices (soft), optional notes.`;
     
-    if (submittedRequests.length === 0) {
+    if (submittedRequests.length === 0 && neverSubmittedDoctors.size === 0) {
       prompt += `\n\nNo doctor preferences have been submitted yet. Use default fair distribution.`;
     } else {
       prompt += `\n\n**Doctor Preferences & Constraints:**`;
+      
+      // Handle submitted requests
       submittedRequests.forEach(request => {
         const doctor = doctors.find(d => d.id === request.doctor_id);
         if (doctor) {
@@ -430,6 +435,19 @@ C) **Even distribution per week:** Avoid stacking many different doctors' weekda
           
           if (request.notes && request.notes.trim()) {
             prompt += `\n- Notes: ${request.notes}`;
+          }
+        }
+      });
+      
+      // Handle doctors marked as "never submitted"
+      doctors.forEach(doctor => {
+        if (neverSubmittedDoctors.has(doctor.id)) {
+          const hasExistingRequest = submittedRequests.some(req => req.doctor_id === doctor.id);
+          if (!hasExistingRequest) {
+            prompt += `\n\n**${doctor.name}:**`;
+            prompt += `\n- No preferences submitted (use default scheduling)`;
+            prompt += `\n- No unavailable dates`;
+            prompt += `\n- No preferred weekends`;
           }
         }
       });
@@ -762,6 +780,16 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
       newExpanded.add(doctorEmail);
     }
     setExpandedRows(newExpanded);
+  };
+
+  const toggleNeverSubmitted = (doctorId: string) => {
+    const newSet = new Set(neverSubmittedDoctors);
+    if (newSet.has(doctorId)) {
+      newSet.delete(doctorId);
+    } else {
+      newSet.add(doctorId);
+    }
+    setNeverSubmittedDoctors(newSet);
   };
 
   const formatDateList = (dates: any[]) => {
@@ -1230,37 +1258,44 @@ Thank you!`;
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <Table>
-                       <TableHeader>
-                         <TableRow>
-                           <TableHead className="w-12"></TableHead>
-                           <TableHead>Doctor</TableHead>
-                           <TableHead>Email</TableHead>
-                           <TableHead>Status</TableHead>
-                           <TableHead>Submitted At</TableHead>
-                         </TableRow>
-                       </TableHeader>
-                       <TableBody>
-                         {doctorStatuses.map((doctor) => (
-                           <React.Fragment key={doctor.email}>
-                             <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => toggleRowExpansion(doctor.email)}>
-                               <TableCell>
-                                 <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                   {expandedRows.has(doctor.email) ? (
-                                     <ChevronDown className="h-4 w-4" />
-                                   ) : (
-                                     <ChevronRight className="h-4 w-4" />
-                                   )}
-                                 </Button>
-                               </TableCell>
-                               <TableCell className="font-medium">{doctor.name}</TableCell>
-                               <TableCell>{doctor.email}</TableCell>
-                               <TableCell>{getStatusBadge(doctor.status)}</TableCell>
-                               <TableCell>{doctor.submittedAt || '-'}</TableCell>
-                             </TableRow>
-                             {expandedRows.has(doctor.email) && doctor.request && (
-                                <TableRow>
-                                  <TableCell colSpan={5} className="bg-muted/30 p-6">
+                     <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12"></TableHead>
+                            <TableHead className="w-20">Never Submitted</TableHead>
+                            <TableHead>Doctor</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Submitted At</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {doctorStatuses.map((doctor) => (
+                            <React.Fragment key={doctor.email}>
+                              <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => toggleRowExpansion(doctor.email)}>
+                                <TableCell>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                    {expandedRows.has(doctor.email) ? (
+                                      <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox 
+                                    checked={neverSubmittedDoctors.has(doctor.id)}
+                                    onCheckedChange={() => toggleNeverSubmitted(doctor.id)}
+                                  />
+                                </TableCell>
+                                <TableCell className="font-medium">{doctor.name}</TableCell>
+                                <TableCell>{doctor.email}</TableCell>
+                                <TableCell>{getStatusBadge(doctor.status)}</TableCell>
+                                <TableCell>{doctor.submittedAt || '-'}</TableCell>
+                              </TableRow>
+                              {expandedRows.has(doctor.email) && doctor.request && (
+                                 <TableRow>
+                                   <TableCell colSpan={6} className="bg-muted/30 p-6">{/* Updated colSpan from 5 to 6 */}
                                     <div className="space-y-4">
                                       <div className="flex items-center justify-between">
                                         <h4 className="font-semibold text-sm">Request Details</h4>
