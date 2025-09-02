@@ -89,6 +89,11 @@ const AdminDashboard = () => {
     notes: ""
   });
 
+  // Publishing state
+  const [publishing, setPublishing] = useState(false);
+  const [publishStatus, setPublishStatus] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [lastPublishResult, setLastPublishResult] = useState<any>(null);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -291,6 +296,52 @@ const AdminDashboard = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const publishToCalendar = async () => {
+    if (!currentBlock) return;
+    
+    setPublishing(true);
+    setPublishStatus(null);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('publish-to-calendar', {
+        body: { 
+          blockId: currentBlock.id,
+          calendarId: 'primary' // Can be made configurable later
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setPublishStatus({
+          type: 'success',
+          message: `Successfully prepared ${data.eventsCreated} events for Google Calendar. ${data.message}`
+        });
+        setLastPublishResult(data);
+        await fetchData(); // Refresh to show updated status
+        toast({
+          title: "Success",
+          description: "Schedule published successfully"
+        });
+      } else {
+        throw new Error(data.error || 'Publication failed');
+      }
+    } catch (error) {
+      console.error('Error publishing to calendar:', error);
+      setPublishStatus({
+        type: 'error',
+        message: `Failed to publish: ${error.message}`
+      });
+      toast({
+        title: "Error",
+        description: "Failed to publish schedule",
+        variant: "destructive"
+      });
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -1613,30 +1664,70 @@ Thank you!`;
                 <CardDescription>Publish schedule to Google Calendar</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Integration Required:</strong> Google Calendar publishing requires OAuth setup 
-                    and backend integration through Supabase Edge Functions.
-                  </AlertDescription>
-                </Alert>
+                {publishStatus && (
+                  <Alert className={publishStatus.type === 'error' ? 'border-destructive bg-destructive/10' : 'border-green-500 bg-green-50'}>
+                    {publishStatus.type === 'error' ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                    <AlertDescription>
+                      {publishStatus.message}
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-                <div className="flex gap-4">
-                  <Button 
-                    onClick={() => updateBlockStatus(currentBlock?.id || '', 'published')}
-                    disabled={!currentBlock || assignments.length === 0 || saving}
-                    className="bg-gradient-primary hover:opacity-90"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {saving ? "Publishing..." : "Publish to Calendar"}
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    disabled={!currentBlock || currentBlock.status !== 'published' || saving}
-                    onClick={() => updateBlockStatus(currentBlock?.id || '', 'closed')}
-                  >
-                    Unpublish Schedule
-                  </Button>
+                <div className="space-y-4">
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <h4 className="font-medium mb-2">Google Calendar Integration Status</h4>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      The backend integration is ready. To enable full Google Calendar publishing, you'll need to:
+                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4">
+                      <li>• Set up Google Calendar OAuth 2.0 credentials</li>
+                      <li>• Configure user authentication flow</li>
+                      <li>• Connect to your target calendar</li>
+                    </ul>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <Button 
+                      onClick={publishToCalendar}
+                      disabled={!currentBlock || assignments.length === 0 || publishing}
+                      className="bg-gradient-primary hover:opacity-90"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {publishing ? "Publishing..." : "Publish to Calendar"}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      disabled={!currentBlock || currentBlock.status !== 'published' || saving}
+                      onClick={() => updateBlockStatus(currentBlock?.id || '', 'closed')}
+                    >
+                      Unpublish Schedule
+                    </Button>
+                  </div>
+
+                  {lastPublishResult && (
+                    <div className="p-3 border rounded bg-muted/30">
+                      <p className="text-sm font-medium">Last Publication:</p>
+                      <p className="text-sm text-muted-foreground">
+                        Created {lastPublishResult.eventsCreated} calendar events
+                      </p>
+                      {lastPublishResult.events && (
+                        <details className="mt-2">
+                          <summary className="text-sm cursor-pointer text-primary hover:underline">
+                            View Events ({lastPublishResult.events.length})
+                          </summary>
+                          <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                            {lastPublishResult.events.map((event, index) => (
+                              <div key={index} className="text-xs p-2 bg-background rounded border">
+                                <strong>{event.summary}</strong>
+                                <br />
+                                {event.start.date} - {event.end.date}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
