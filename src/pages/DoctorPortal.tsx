@@ -606,7 +606,7 @@ const DoctorPortal = () => {
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                <Button variant="outline" size="lg" onClick={handleSaveDraft} disabled={!canEdit || saving} className="w-full sm:flex-1 sm:flex-none">
+                <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={!canEdit || saving} className="w-auto">
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? "Saving..." : "Save Draft"}
                 </Button>
