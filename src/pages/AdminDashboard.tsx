@@ -568,6 +568,53 @@ const AdminDashboard = () => {
     }).join(', ');
   };
 
+  const handleSendReminders = () => {
+    if (!currentBlock) return;
+    
+    // Find doctors who haven't submitted requests
+    const nonSubmitters = doctors.filter(doctor => {
+      const request = doctorRequests.find(req => req.doctor_id === doctor.id && req.block_id === currentBlock.id);
+      return !request || request.status === 'not_started';
+    }).filter(doctor => doctor.active); // Only include active doctors
+    
+    if (nonSubmitters.length === 0) {
+      toast({
+        title: "No Reminders Needed",
+        description: "All active doctors have already submitted their requests.",
+      });
+      return;
+    }
+    
+    const recipientEmails = nonSubmitters.map(doctor => doctor.email).join(',');
+    const blockDates = `${format(parseLocalDate(currentBlock.start_monday_date), 'MMMM d')} - ${format(parseLocalDate(currentBlock.end_sunday_date), 'MMMM d, yyyy')}`;
+    const deadlineText = currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMMM d, yyyy') : 'soon';
+    
+    const subject = encodeURIComponent(`Reminder: Call Schedule Preferences Needed - ${blockDates}`);
+    const body = encodeURIComponent(`Dear Colleague,
+
+This is a friendly reminder that we need your call schedule preferences for the upcoming call block:
+
+Call Block Dates: ${blockDates}
+Submission Deadline: ${deadlineText}
+
+Please log into the call scheduling system to submit:
+• Your unavailable dates
+• Your preferred weekend call preferences
+• Any additional notes or special requests
+
+Your input is essential for creating a fair and balanced call schedule for everyone.
+
+If you have any questions or technical difficulties, please don't hesitate to reach out.
+
+Thank you for your prompt attention to this matter.
+
+Best regards,
+Call Schedule Coordinator`);
+    
+    const mailtoLink = `mailto:${recipientEmails}?subject=${subject}&body=${body}`;
+    window.open(mailtoLink, '_self');
+  };
+
   // Edit request functions
   const openEditRequestDialog = (doctor: any) => {
     if (!doctor.request) {
@@ -879,7 +926,12 @@ const AdminDashboard = () => {
                         <CardDescription>Track submission status for all doctors</CardDescription>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={handleSendReminders}
+                          disabled={!currentBlock}
+                        >
                           <Mail className="h-4 w-4 mr-2" />
                           Send Reminders
                         </Button>
