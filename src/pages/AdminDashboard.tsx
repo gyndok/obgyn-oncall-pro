@@ -294,6 +294,81 @@ const AdminDashboard = () => {
     }
   };
 
+  // Generate AI prompt based on doctor requests and preferences
+  const generateAIPrompt = () => {
+    if (!currentBlock) return "No active block available.";
+
+    const blockStart = parseLocalDate(currentBlock.start_monday_date);
+    const blockEnd = parseLocalDate(currentBlock.end_sunday_date);
+    
+    // Get submitted requests
+    const submittedRequests = doctorRequests.filter(req => req.status === 'submitted');
+    
+    let prompt = `You are a medical call scheduling AI. Please create an optimal 7-week call schedule with the following constraints:
+
+**SCHEDULE PERIOD:**
+- Start Date: ${format(blockStart, 'EEEE, MMMM d, yyyy')}
+- End Date: ${format(blockEnd, 'EEEE, MMMM d, yyyy')}
+- Duration: 7 weeks (49 days total)
+
+**DOCTORS AVAILABLE:**`;
+    
+    doctors.filter(d => d.active).forEach(doctor => {
+      prompt += `\n- ${doctor.name} (${doctor.email})`;
+    });
+
+    prompt += `\n\n**DOCTOR PREFERENCES & CONSTRAINTS:**`;
+    
+    if (submittedRequests.length === 0) {
+      prompt += `\nNo specific preferences submitted yet. Use fair rotation.`;
+    } else {
+      submittedRequests.forEach(request => {
+        const doctor = doctors.find(d => d.id === request.doctor_id);
+        if (doctor) {
+          prompt += `\n\n**${doctor.name}:**`;
+          
+          if (request.unavailable_dates && request.unavailable_dates.length > 0) {
+            const unavailableDates = request.unavailable_dates.map(dateStr => 
+              format(parseLocalDate(dateStr), 'MMM d, yyyy')
+            ).join(', ');
+            prompt += `\n- UNAVAILABLE: ${unavailableDates}`;
+          }
+          
+          if (request.preferred_weekends && request.preferred_weekends.length > 0) {
+            const preferredWeekends = request.preferred_weekends.map(w => `Week ${w}`).join(', ');
+            prompt += `\n- PREFERS WEEKENDS: ${preferredWeekends}`;
+          }
+          
+          if (request.notes && request.notes.trim()) {
+            prompt += `\n- NOTES: ${request.notes}`;
+          }
+        }
+      });
+    }
+
+    prompt += `\n\n**SCHEDULING REQUIREMENTS:**
+1. Each doctor should have roughly equal call distribution
+2. Weekend shifts (Friday-Sunday) are critical and should be prioritized
+3. Avoid consecutive weekend assignments for the same doctor when possible
+4. Respect all unavailable dates as hard constraints
+5. Consider weekend preferences but balance fairness
+6. Ensure no doctor is assigned during their unavailable dates
+
+**OUTPUT FORMAT:**
+Please provide a day-by-day assignment in this format:
+- Monday, [Date]: Dr. [Name]
+- Tuesday, [Date]: Dr. [Name]
+... etc for all 49 days
+
+**OPTIMIZATION GOALS:**
+- Minimize total preference violations
+- Maximize weekend coverage by doctors who prefer weekends
+- Ensure fair distribution of workload
+- Consider work-life balance by avoiding excessive consecutive assignments`;
+
+    return prompt;
+  };
+
   const startEditingDates = () => {
     if (currentBlock) {
       setEditStartDate(parseLocalDate(currentBlock.start_monday_date));
@@ -1234,6 +1309,38 @@ Thank you!`;
                     </Button>
                   </div>
                 </div>
+
+                {/* AI Prompt Preview */}
+                <Card className="card-stats">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-xl">
+                      <Settings className="h-5 w-5 text-primary" />
+                      AI Scheduling Prompt Preview
+                    </CardTitle>
+                    <CardDescription>
+                      This is the prompt that would be sent to AI for intelligent schedule generation
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted/50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                      <pre className="text-sm whitespace-pre-wrap font-mono text-muted-foreground">
+                        {generateAIPrompt()}
+                      </pre>
+                    </div>
+                    <div className="mt-4 p-3 bg-accent/10 border border-accent/20 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <div className="h-2 w-2 rounded-full bg-accent mt-2 flex-shrink-0"></div>
+                        <div className="text-sm">
+                          <p className="font-medium text-accent mb-1">Future Enhancement</p>
+                          <p className="text-muted-foreground">
+                            This prompt will be used when AI-powered scheduling is implemented. 
+                            Currently using simple round-robin assignment.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {assignments.length > 0 ? (
                   <ScheduleVisualization />
