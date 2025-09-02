@@ -52,6 +52,8 @@ const parseLocalDate = (dateString: string) => {
 };
 
 const AdminDashboard = () => {
+  console.log('AdminDashboard component rendering');
+  
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [blocks, setBlocks] = useState<any[]>([]);
@@ -300,18 +302,25 @@ const AdminDashboard = () => {
   };
 
   const publishToCalendar = async () => {
-    if (!currentBlock) return;
+    console.log('publishToCalendar function called', { currentBlock });
+    if (!currentBlock) {
+      console.log('No current block, returning early');
+      return;
+    }
     
     setPublishing(true);
     setPublishStatus(null);
     
     try {
+      console.log('Calling supabase function with:', { blockId: currentBlock.id });
       const { data, error } = await supabase.functions.invoke('publish-to-calendar', {
         body: { 
           blockId: currentBlock.id,
           calendarId: 'primary' // Can be made configurable later
         }
       });
+
+      console.log('Supabase function response:', { data, error });
 
       if (error) throw error;
 
