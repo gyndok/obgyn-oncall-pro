@@ -1283,10 +1283,14 @@ Thank you!`;
                                   </Button>
                                 </TableCell>
                                 <TableCell onClick={(e) => e.stopPropagation()}>
-                                  <Checkbox 
-                                    checked={neverSubmittedDoctors.has(doctor.id)}
-                                    onCheckedChange={() => toggleNeverSubmitted(doctor.id)}
-                                  />
+                                  {doctor.status !== 'submitted' ? (
+                                    <Checkbox 
+                                      checked={neverSubmittedDoctors.has(doctor.id)}
+                                      onCheckedChange={() => toggleNeverSubmitted(doctor.id)}
+                                    />
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm">-</span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="font-medium">{doctor.name}</TableCell>
                                 <TableCell>{doctor.email}</TableCell>
