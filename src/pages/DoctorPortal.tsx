@@ -382,48 +382,48 @@ const DoctorPortal = () => {
       </ProtectedRoute>;
   }
   return <ProtectedRoute>
-      <div className="min-h-screen bg-background p-4">
-        <div className="container mx-auto max-w-4xl">
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto max-w-6xl p-6">
           {/* Header */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-4">
-                <h1 className="text-3xl font-bold text-foreground">Doctor Portal</h1>
-                <Badge variant="outline">
+                <h1 className="heading-dashboard">Doctor Portal</h1>
+                <Badge variant="secondary" className="px-3 py-1">
                   {doctorRecord?.name || user?.email}
                 </Badge>
               </div>
-              <div className="flex items-center gap-2">
-                {isAdmin && <Button variant="outline" onClick={() => navigate('/admin')} className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                {isAdmin && <Button variant="outline" onClick={() => navigate('/admin')} className="btn-outline-modern">
                     <Settings className="h-4 w-4" />
                     Admin Dashboard
                   </Button>}
               </div>
             </div>
-            <p className="text-muted-foreground">Submit your time-off requests and weekend preferences for the upcoming call block.</p>
+            <p className="subheading-dashboard">Submit your time-off requests and weekend preferences for the upcoming call block.</p>
           </div>
 
           {/* Block Information */}
-          <Card className="mb-6 bg-gradient-card shadow-soft">
+          <Card className="card-stats mb-6">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <CalendarIcon className="h-5 w-5 text-primary" />
                 Call Block Information
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Start Date</Label>
-                  <p className="text-lg font-semibold">{format(parseLocalDate(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="text-center md:text-left">
+                  <Label className="stat-label">Start Date</Label>
+                  <p className="stat-number text-primary">{format(parseLocalDate(currentBlock.start_monday_date), 'MMM d, yyyy')}</p>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">End Date</Label>
-                  <p className="text-lg font-semibold">{format(parseLocalDate(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
+                <div className="text-center md:text-left">
+                  <Label className="stat-label">End Date</Label>
+                  <p className="stat-number text-primary">{format(parseLocalDate(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Submission Deadline</Label>
-                  <p className="text-lg font-semibold text-destructive">
+                <div className="text-center md:text-left">
+                  <Label className="stat-label">Submission Deadline</Label>
+                  <p className="stat-number text-destructive">
                     {currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMM d, yyyy h:mm a') : 'No deadline set'}
                   </p>
                 </div>
@@ -431,27 +431,27 @@ const DoctorPortal = () => {
             </CardContent>
           </Card>
 
-          <Tabs defaultValue="preferences" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 h-auto">
-              <TabsTrigger value="preferences" className="text-xs sm:text-sm py-2 sm:py-2.5">
+          <Tabs defaultValue="preferences" className="space-dashboard">
+            <TabsList className="grid w-full grid-cols-3 h-12 p-1 bg-muted rounded-xl">
+              <TabsTrigger value="preferences" className="rounded-lg font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <span className="hidden sm:inline">Submit </span>Preferences
               </TabsTrigger>
-              <TabsTrigger value="team-status" className="text-xs sm:text-sm py-2 sm:py-2.5">
+              <TabsTrigger value="team-status" className="rounded-lg font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <span className="hidden sm:inline">Team </span>Status
               </TabsTrigger>
-              <TabsTrigger value="schedule" className="text-xs sm:text-sm py-2 sm:py-2.5">
+              <TabsTrigger value="schedule" className="rounded-lg font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <span className="hidden sm:inline">Call </span>Schedule
               </TabsTrigger>
             </TabsList>
 
             {/* Preferences Tab */}
-            <TabsContent value="preferences" className="space-y-4 sm:space-y-6">
-              <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
+            <TabsContent value="preferences" className="space-dashboard">
+              <div className="grid lg:grid-cols-2 gap-6">
                 {/* Unavailable Dates */}
-                <Card className="shadow-soft">
+                <Card className="card-stats hover-lift">
                   <CardHeader>
-                    <CardTitle className="text-lg sm:text-xl">Unavailable Dates</CardTitle>
-                    <CardDescription className="text-sm sm:text-base">
+                    <CardTitle className="text-xl text-primary">Unavailable Dates</CardTitle>
+                    <CardDescription>
                       Select any dates you are not available for call duties (hard excludes)
                     </CardDescription>
                   </CardHeader>
@@ -534,9 +534,9 @@ const DoctorPortal = () => {
                 </Card>
 
                 {/* Weekend Preferences */}
-                <Card className="shadow-soft">
+                <Card className="card-stats hover-lift">
                   <CardHeader>
-                    <CardTitle className="text-lg sm:text-xl">Weekend Preferences</CardTitle>
+                    <CardTitle className="text-xl text-primary">Weekend Preferences</CardTitle>
                     <CardDescription className="text-sm sm:text-base">Select your preferred weekend(s) for call duties (Friday-Sunday blocks).  </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -567,10 +567,10 @@ const DoctorPortal = () => {
               </div>
 
               {/* Notes */}
-              <Card className="shadow-soft">
+              <Card className="card-stats">
                 <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Additional Notes</CardTitle>
-                  <CardDescription className="text-sm sm:text-base">
+                  <CardTitle className="text-xl text-primary">Additional Notes</CardTitle>
+                  <CardDescription>
                     Any additional information or special requests (optional)
                   </CardDescription>
                 </CardHeader>
@@ -605,12 +605,12 @@ const DoctorPortal = () => {
                 </Alert>}
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={!canEdit || saving} className="w-auto">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button variant="outline" onClick={handleSaveDraft} disabled={!canEdit || saving} className="btn-outline-modern">
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? "Saving..." : "Save Draft"}
                 </Button>
-                <Button size="sm" onClick={handleSubmit} disabled={!canEdit || saving} className="w-auto bg-gradient-primary hover:opacity-90">
+                <Button onClick={handleSubmit} disabled={!canEdit || saving} className="btn-primary-glow">
                   <Send className="h-4 w-4 mr-2" />
                   {saving ? "Submitting..." : isSubmitted ? "Update Submission" : "Submit Preferences"}
                 </Button>
@@ -618,11 +618,11 @@ const DoctorPortal = () => {
             </TabsContent>
 
             {/* Team Status Tab */}
-            <TabsContent value="team-status" className="space-y-6">
-              <Card className="shadow-soft">
+            <TabsContent value="team-status" className="space-dashboard">
+              <Card className="card-stats">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Users className="h-5 w-5 text-primary" />
                     Team Submission Status
                   </CardTitle>
                   <CardDescription>
@@ -677,25 +677,25 @@ const DoctorPortal = () => {
                   })}
                   </div>
                   
-                  {/* Summary Stats */}
-                  <div className="mt-6 pt-4 border-t grid grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-success">
+                   {/* Summary Stats */}
+                  <div className="mt-6 pt-6 border-t grid grid-cols-3 gap-6">
+                    <div className="text-center p-4 rounded-lg bg-success/10 border border-success/20">
+                      <div className="stat-number text-success">
                         {allDoctorRequests.filter(req => req.status === 'submitted').length}
                       </div>
-                      <div className="text-sm text-muted-foreground">Submitted</div>
+                      <div className="stat-label">Submitted</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-warning">
+                    <div className="text-center p-4 rounded-lg bg-warning/10 border border-warning/20">
+                      <div className="stat-number text-warning">
                         {allDoctorRequests.filter(req => req.status === 'in_progress').length}
                       </div>
-                      <div className="text-sm text-muted-foreground">In Progress</div>
+                      <div className="stat-label">In Progress</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-muted-foreground">
+                    <div className="text-center p-4 rounded-lg bg-muted/50 border border-border">
+                      <div className="stat-number text-muted-foreground">
                         {allDoctors.length - allDoctorRequests.length}
                       </div>
-                      <div className="text-sm text-muted-foreground">Not Started</div>
+                      <div className="stat-label">Not Started</div>
                     </div>
                   </div>
                 </CardContent>
@@ -703,11 +703,11 @@ const DoctorPortal = () => {
             </TabsContent>
 
             {/* Schedule Tab */}
-            <TabsContent value="schedule" className="space-y-6">
-              <Card className="shadow-soft">
+            <TabsContent value="schedule" className="space-dashboard">
+              <Card className="card-stats">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CalendarIcon className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <CalendarIcon className="h-5 w-5 text-primary" />
                     Call Schedule Calendar
                   </CardTitle>
                   <CardDescription>
