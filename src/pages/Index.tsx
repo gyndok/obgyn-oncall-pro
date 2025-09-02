@@ -2,13 +2,22 @@ import { Calendar, Users, Shield, Clock, CheckCircle, LogOut, LogIn } from "luci
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 const Index = () => {
   const {
     user,
     signOut
   } = useAuth();
+  const navigate = useNavigate();
+  
+  const handleGetStarted = () => {
+    if (user) {
+      navigate('/doctor');
+    } else {
+      navigate('/auth');
+    }
+  };
   const features = [{
     icon: <Calendar className="h-6 w-6" />,
     title: "Automated Scheduling",
@@ -135,7 +144,7 @@ const Index = () => {
             <Clock className="h-5 w-5" />
             <span>Setup takes less than 10 minutes</span>
           </div>
-          <Button size="lg" className="bg-gradient-primary hover:opacity-90 shadow-medium">
+          <Button size="lg" className="bg-gradient-primary hover:opacity-90 shadow-medium" onClick={handleGetStarted}>
             Get Started Today
           </Button>
         </div>
