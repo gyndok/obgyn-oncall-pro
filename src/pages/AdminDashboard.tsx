@@ -430,7 +430,7 @@ const AdminDashboard = () => {
           week_index: item.week_index || item.week || 1,
           date: format(date, 'yyyy-MM-dd'),
           is_weekend: isWeekend,
-          weekday_name: item.weekday || dayName,
+          weekday_name: dayName, // Use the full day name from the date
           doctor_id: doctor.id
         };
       }).filter(Boolean);
