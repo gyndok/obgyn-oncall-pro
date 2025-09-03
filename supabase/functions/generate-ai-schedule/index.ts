@@ -71,7 +71,7 @@ RESPONSE FORMAT (REQUIRED):
       "doctor_name": "Klein",
       "is_weekend": false,
       "weekday_name": "Monday",
-      "week_index": 0
+      "week_index": 1
     },
     ...
   ],
@@ -85,6 +85,7 @@ RESPONSE FORMAT (REQUIRED):
 
 CRITICAL REQUIREMENTS:
 - Generate exactly 49 assignments (7 weeks × 7 days)
+- Week_index must be 1-7 (Week 1 = Nov 3-9, Week 2 = Nov 10-16, etc.)
 - Each doctor gets exactly one weekend bundle (Fri+Sat+Sun)
 - Each doctor gets exactly 4 weekdays (Mon-Thu)
 - LeBlanc never gets Tuesday
