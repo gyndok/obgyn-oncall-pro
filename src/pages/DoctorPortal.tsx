@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { format, parseISO, addDays, addWeeks, isSameDay, getYear, getMonth, getDate, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday } from "date-fns";
-import { CalendarIcon, Clock, CheckCircle, AlertTriangle, Star, Calendar as CalendarIconLucide, Save, Send, AlertCircle, ChevronLeft, ChevronRight, Settings, Users } from "lucide-react";
+import { CalendarIcon, Clock, CheckCircle, AlertTriangle, Star, Calendar as CalendarIconLucide, Save, Send, AlertCircle, ChevronLeft, ChevronRight, Settings, Users, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -82,7 +82,8 @@ const isHoliday = (date: Date) => {
 const DoctorPortal = () => {
   const {
     user,
-    isAdmin
+    isAdmin,
+    signOut
   } = useAuth();
   const navigate = useNavigate();
   const [selectedUnavailableDates, setSelectedUnavailableDates] = useState<Date[]>([]);
@@ -398,6 +399,10 @@ const DoctorPortal = () => {
                     <Settings className="h-4 w-4" />
                     Admin Dashboard
                   </Button>}
+                <Button variant="outline" onClick={signOut} className="btn-outline-modern">
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </Button>
               </div>
             </div>
             <p className="subheading-dashboard">Submit your time-off requests and weekend preferences for the upcoming call block.</p>
