@@ -8,6 +8,7 @@ import { useFirstLoginTracker } from "./hooks/useFirstLoginTracker";
 import DoctorPortal from "./pages/DoctorPortal";
 import AdminDashboard from "./pages/AdminDashboard";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -18,6 +19,7 @@ const AppContent = () => {
   return (
     <Routes>
       <Route path="/" element={<Auth />} />
+      <Route path="/auth/reset-password" element={<ResetPassword />} />
       <Route path="/doctor" element={<DoctorPortal />} />
       <Route path="/admin" element={<AdminDashboard />} />
       <Route path="*" element={<NotFound />} />
