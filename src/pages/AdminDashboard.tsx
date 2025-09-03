@@ -1377,13 +1377,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                               {expandedRows.has(doctor.email) && doctor.request && <TableRow>
                                    <TableCell colSpan={7} className="bg-muted/30 p-6">{/* Updated colSpan from 6 to 7 */}
                                     <div className="space-y-4">
-                                      <div className="flex items-center justify-between">
-                                        <h4 className="font-semibold text-sm">Request Details</h4>
-                                        <Button variant="outline" size="sm" onClick={() => openEditRequestDialog(doctor)}>
-                                          <Edit className="h-3 w-3 mr-1" />
-                                          Edit Request
-                                        </Button>
-                                      </div>
+                                       <h4 className="font-semibold text-sm">Request Details</h4>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                         <div>
                                           <Label className="font-medium text-muted-foreground">Unavailable Dates</Label>
