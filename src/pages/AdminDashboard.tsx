@@ -421,7 +421,7 @@ const AdminDashboard = () => {
           return null;
         }
 
-        const date = new Date(item.date);
+        const date = parseLocalDate(item.date); // Use parseLocalDate to avoid timezone issues
         // Use the weekday from ChatGPT data instead of recalculating to avoid timezone issues
         const dayName = item.weekday ? item.weekday : format(date, 'EEE');
         const isWeekend = item.is_weekend ?? (dayName === 'Sat' || dayName === 'Sun');
