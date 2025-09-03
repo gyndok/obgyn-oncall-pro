@@ -57,7 +57,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
@@ -83,23 +83,29 @@ RESPONSE FORMAT (REQUIRED):
   }
 }
 
-CRITICAL REQUIREMENTS:
+CRITICAL REQUIREMENTS (FOLLOW EXACTLY):
 - Generate exactly 49 assignments (7 weeks × 7 days)
 - Week_index must be 1-7 (Week 1 = Nov 3-9, Week 2 = Nov 10-16, etc.)
-- Each doctor gets exactly one weekend bundle (Fri+Sat+Sun)
-- Each doctor gets exactly 4 weekdays (Mon-Thu)
-- LeBlanc never gets Tuesday
+- Each doctor gets exactly ONE weekend bundle (Fri+Sat+Sun of same week)
+- Each doctor gets exactly 4 weekdays (Mon-Thu only)
+- LeBlanc never gets Tuesday (constraint violation if assigned)
 - Use exact doctor names: Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson
 - Use abbreviated weekday names: Mon, Tue, Wed, Thu, Fri, Sat, Sun
 - Dates must be in YYYY-MM-DD format
-- Respond ONLY with valid JSON, no other text`
+- Respond ONLY with valid JSON, no other text
+
+VALIDATION RULES:
+- Verify each doctor has exactly 1 weekend and 4 weekdays
+- Verify LeBlanc has 0 Tuesday assignments
+- Verify all 49 days are covered with no gaps or duplicates`
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_completion_tokens: 4000
+        max_tokens: 4000,
+        temperature: 0.1
       }),
     });
 
