@@ -422,7 +422,8 @@ const AdminDashboard = () => {
         }
 
         const date = new Date(item.date);
-        const dayName = format(date, 'EEE'); // Use abbreviated format: Mon, Tue, Wed, etc.
+        // Use the weekday from ChatGPT data instead of recalculating to avoid timezone issues
+        const dayName = item.weekday ? item.weekday : format(date, 'EEE');
         const isWeekend = item.is_weekend ?? (dayName === 'Sat' || dayName === 'Sun');
 
         return {
@@ -430,7 +431,7 @@ const AdminDashboard = () => {
           week_index: item.week_index || item.week || 1,
           date: format(date, 'yyyy-MM-dd'),
           is_weekend: isWeekend,
-          weekday_name: dayName, // Now using abbreviated format
+          weekday_name: dayName, // Use the original weekday from ChatGPT
           doctor_id: doctor.id
         };
       }).filter(Boolean);
