@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const deepseekApiKey = Deno.env.get('DEEPSEEK_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,7 +34,7 @@ serve(async (req) => {
 
   try {
     console.log('📝 Starting AI schedule generation...');
-    console.log('📝 OpenAI API Key present:', !!openAIApiKey);
+    console.log('📝 DeepSeek API Key present:', !!deepseekApiKey);
     console.log('📝 Request body received');
     
     const { prompt, blockStartDate, doctors }: ScheduleRequest = await req.json();
@@ -46,18 +46,18 @@ serve(async (req) => {
       doctorNames: doctors?.map(d => d.name) || []
     });
 
-    console.log('📝 Sending AI scheduling prompt to OpenAI...');
+    console.log('📝 Sending AI scheduling prompt to DeepSeek...');
     console.log('Block start date:', blockStartDate);
     console.log('Number of doctors:', doctors.length);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${deepseekApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'deepseek-chat',
         messages: [
           {
             role: 'system',
@@ -99,23 +99,23 @@ CRITICAL CONSTRAINTS:
             content: prompt
           }
         ],
-        max_completion_tokens: 4000
+        max_tokens: 4000
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenAI API error details:', {
+      console.error('DeepSeek API error details:', {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
         errorBody: errorText
       });
-      throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(`DeepSeek API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const aiResponse = await response.json();
-    console.log('✅ Received response from OpenAI');
+    console.log('✅ Received response from DeepSeek');
 
     const aiContent = aiResponse.choices[0].message.content;
     console.log('Raw AI response:', aiContent);
