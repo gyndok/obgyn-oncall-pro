@@ -33,7 +33,18 @@ serve(async (req) => {
   }
 
   try {
+    console.log('📝 Starting AI schedule generation...');
+    console.log('📝 OpenAI API Key present:', !!openAIApiKey);
+    console.log('📝 Request body received');
+    
     const { prompt, blockStartDate, doctors }: ScheduleRequest = await req.json();
+    
+    console.log('📝 Parsed request data:', {
+      promptLength: prompt?.length || 0,
+      blockStartDate,
+      doctorCount: doctors?.length || 0,
+      doctorNames: doctors?.map(d => d.name) || []
+    });
 
     console.log('📝 Sending AI scheduling prompt to OpenAI...');
     console.log('Block start date:', blockStartDate);
@@ -46,7 +57,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
@@ -86,7 +97,8 @@ CRITICAL REQUIREMENTS:
             content: prompt
           }
         ],
-        max_completion_tokens: 4000
+        max_tokens: 4000,
+        temperature: 0.3
       }),
     });
 
