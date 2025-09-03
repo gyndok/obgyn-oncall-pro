@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Users, Calendar as CalendarIcon, Send, Download, CheckCircle, Clock, AlertTriangle, Mail, Lock, Play, Upload, Plus, Edit, Trash2, Save, X, ChevronDown, ChevronRight, UserCheck } from "lucide-react";
+import { Settings, Users, Calendar as CalendarIcon, Send, Download, CheckCircle, Clock, AlertTriangle, Mail, Lock, Play, Upload, Plus, Edit, Trash2, Save, X, ChevronDown, ChevronRight, UserCheck, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +33,8 @@ const AdminDashboard = () => {
   console.log('AdminDashboard component rendering');
   const {
     user,
-    isAdmin
+    isAdmin,
+    signOut
   } = useAuth();
   const navigate = useNavigate();
   const [blocks, setBlocks] = useState<any[]>([]);
@@ -1129,6 +1130,10 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
             <Button variant="outline" onClick={() => navigate('/doctor')} className="flex items-center gap-2">
               <UserCheck className="h-4 w-4" />
               Switch to Doctor View
+            </Button>
+            <Button variant="outline" onClick={signOut} className="flex items-center gap-2">
+              <LogOut className="h-4 w-4" />
+              Logout
             </Button>
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
