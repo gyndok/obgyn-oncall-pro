@@ -378,23 +378,43 @@ const AdminDashboard = () => {
         return;
       }
 
-      // Validate the structure
-      if (!scheduleData.schedule || !Array.isArray(scheduleData.schedule)) {
+      // Validate the structure - handle both old and new formats
+      let scheduleArray;
+      if (scheduleData.assignments && Array.isArray(scheduleData.assignments)) {
+        // New ChatGPT format
+        scheduleArray = scheduleData.assignments;
+      } else if (scheduleData.schedule && Array.isArray(scheduleData.schedule)) {
+        // Old format
+        scheduleArray = scheduleData.schedule;
+      } else {
         toast({
           title: "Import Failed", 
-          description: "Invalid schedule format. Expected 'schedule' array in the response.",
+          description: "Invalid schedule format. Expected 'assignments' or 'schedule' array in the response.",
           variant: "destructive"
         });
         return;
       }
 
       // Convert the schedule data to assignments
-      const importedAssignments = scheduleData.schedule.map((item: any) => {
-        // Find the doctor by name
-        const doctor = doctors.find(d => 
-          d.name.toLowerCase().includes(item.doctor?.toLowerCase()) ||
-          item.doctor?.toLowerCase().includes(d.name.toLowerCase())
-        );
+      const importedAssignments = scheduleArray.map((item: any) => {
+        // Find the doctor by name (more flexible matching)
+        const doctor = doctors.find(d => {
+          const doctorNameLower = d.name.toLowerCase();
+          const itemDoctorLower = (item.doctor || '').toLowerCase();
+          
+          // Try exact match first
+          if (doctorNameLower === itemDoctorLower) return true;
+          
+          // Try partial matches
+          if (doctorNameLower.includes(itemDoctorLower) || itemDoctorLower.includes(doctorNameLower)) return true;
+          
+          // Try matching by last name only
+          const doctorLastName = doctorNameLower.split(' ').pop() || '';
+          const itemLastName = itemDoctorLower.split(' ').pop() || '';
+          if (doctorLastName && itemLastName && doctorLastName === itemLastName) return true;
+          
+          return false;
+        });
 
         if (!doctor) {
           console.warn(`Doctor not found for: ${item.doctor}`);
@@ -403,14 +423,14 @@ const AdminDashboard = () => {
 
         const date = new Date(item.date);
         const dayName = format(date, 'EEEE');
-        const isWeekend = dayName === 'Saturday' || dayName === 'Sunday';
+        const isWeekend = item.is_weekend ?? (dayName === 'Saturday' || dayName === 'Sunday');
 
         return {
           block_id: currentBlock.id,
-          week_index: item.week || 1,
+          week_index: item.week_index || item.week || 1,
           date: format(date, 'yyyy-MM-dd'),
           is_weekend: isWeekend,
-          weekday_name: dayName,
+          weekday_name: item.weekday || dayName,
           doctor_id: doctor.id
         };
       }).filter(Boolean);
