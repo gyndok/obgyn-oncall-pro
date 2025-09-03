@@ -55,6 +55,17 @@ const handler = async (req: Request): Promise<Response> => {
             </a>
           </div>
           
+          <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+            <h3 style="margin: 0 0 10px 0; color: #92400e;">First Time Accessing the Portal?</h3>
+            <p style="margin: 0; color: #92400e;">
+              If this is your first time using the portal, you'll need to create an account:
+              <br>• Click the link above
+              <br>• Choose "Sign Up" 
+              <br>• Use <strong>this email address (${doctorEmail})</strong> to create your account
+              <br>• Once signed up, your account will be automatically linked to your doctor profile
+            </p>
+          </div>
+          
           <p>If you have any questions or technical issues, please contact the administration team.</p>
           
           <p>Thank you for your cooperation.</p>
