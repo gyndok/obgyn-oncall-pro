@@ -354,7 +354,7 @@ const AdminDashboard = () => {
 
       toast({
         title: "AI Schedule Generated Successfully! 🤖",
-        description: `Created ${aiAssignments.length} assignments using ChatGPT with doctor preferences`,
+        description: `Created ${aiAssignments.length} assignments using DeepSeek AI with doctor preferences`,
       });
 
       fetchData();
