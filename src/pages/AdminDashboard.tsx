@@ -389,50 +389,92 @@ const AdminDashboard = () => {
       const importedAssignments = [];
       const doctorNameToId: Record<string, string> = {};
       
-      // Create doctor name mapping
+      // Create doctor name mapping (handle last names and full names)
       doctors.forEach(doctor => {
         const lastName = doctor.name.split(' ').pop()?.toLowerCase();
+        const firstName = doctor.name.split(' ')[0]?.toLowerCase();
         if (lastName) {
           doctorNameToId[lastName] = doctor.id;
           doctorNameToId[doctor.name.toLowerCase()] = doctor.id;
         }
+        if (firstName) {
+          doctorNameToId[firstName] = doctor.id;
+        }
       });
       
-      // Process each schedule entry
-      for (const entry of Array.isArray(scheduleData) ? scheduleData : [scheduleData]) {
-        const date = entry.date || entry.Date;
-        const doctorName = (entry.doctor || entry.Doctor || entry.name || entry.Name)?.toLowerCase();
-        
-        if (!date || !doctorName) continue;
-        
-        const doctorId = doctorNameToId[doctorName] || 
-                        Object.keys(doctorNameToId).find(key => 
-                          key.includes(doctorName) || doctorName.includes(key)
-                        );
-        
-        if (!doctorId) {
-          console.warn(`Doctor not found: ${doctorName}`);
-          continue;
+      // Handle structured ChatGPT JSON format
+      if (scheduleData.assignments && Array.isArray(scheduleData.assignments)) {
+        // This is the structured format from ChatGPT
+        for (const entry of scheduleData.assignments) {
+          const date = entry.date;
+          const doctorName = entry.doctor?.toLowerCase();
+          const isWeekend = entry.is_weekend;
+          const weekIndex = entry.week_index;
+          const weekdayName = entry.weekday;
+          
+          if (!date || !doctorName) {
+            console.warn(`Missing date or doctor in entry:`, entry);
+            continue;
+          }
+          
+          const doctorId = doctorNameToId[doctorName] || 
+                          Object.keys(doctorNameToId).find(key => 
+                            key.includes(doctorName) || doctorName.includes(key)
+                          );
+          
+          if (!doctorId) {
+            console.warn(`Doctor not found: ${doctorName}`);
+            continue;
+          }
+          
+          importedAssignments.push({
+            block_id: currentBlock.id,
+            week_index: weekIndex,
+            date: date,
+            weekday_name: weekdayName,
+            is_weekend: isWeekend,
+            doctor_id: doctorId
+          });
         }
+      } else {
+        // Handle simple array format or single entries
+        const entries = Array.isArray(scheduleData) ? scheduleData : [scheduleData];
         
-        const assignmentDate = new Date(date);
-        const dayOfWeek = assignmentDate.getDay();
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6; // Sun, Fri, Sat
-        
-        // Calculate week index
-        const blockStart = parseLocalDate(currentBlock.start_monday_date);
-        const weekIndex = Math.floor((assignmentDate.getTime() - blockStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-        
-        const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        
-        importedAssignments.push({
-          block_id: currentBlock.id,
-          week_index: weekIndex,
-          date: format(assignmentDate, 'yyyy-MM-dd'),
-          weekday_name: weekdays[dayOfWeek],
-          is_weekend: isWeekend,
-          doctor_id: doctorId
-        });
+        for (const entry of entries) {
+          const date = entry.date || entry.Date;
+          const doctorName = (entry.doctor || entry.Doctor || entry.name || entry.Name)?.toLowerCase();
+          
+          if (!date || !doctorName) continue;
+          
+          const doctorId = doctorNameToId[doctorName] || 
+                          Object.keys(doctorNameToId).find(key => 
+                            key.includes(doctorName) || doctorName.includes(key)
+                          );
+          
+          if (!doctorId) {
+            console.warn(`Doctor not found: ${doctorName}`);
+            continue;
+          }
+          
+          const assignmentDate = new Date(date);
+          const dayOfWeek = assignmentDate.getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6; // Sun, Fri, Sat
+          
+          // Calculate week index
+          const blockStart = parseLocalDate(currentBlock.start_monday_date);
+          const weekIndex = Math.floor((assignmentDate.getTime() - blockStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+          
+          const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          
+          importedAssignments.push({
+            block_id: currentBlock.id,
+            week_index: weekIndex,
+            date: format(assignmentDate, 'yyyy-MM-dd'),
+            weekday_name: weekdays[dayOfWeek],
+            is_weekend: isWeekend,
+            doctor_id: doctorId
+          });
+        }
       }
       
       if (importedAssignments.length === 0) {
