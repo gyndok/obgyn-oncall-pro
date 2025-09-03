@@ -10,7 +10,6 @@ import { ArrowLeft, Mail, Lock, User, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,8 +18,12 @@ const Auth = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('signin');
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const {
+    user
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -33,64 +36,53 @@ const Auth = () => {
       }
     }
   }, [user, navigate]);
-
   const validateForm = (isSignUp: boolean) => {
     if (!email || !password) {
       setError('Please fill in all required fields');
       return false;
     }
-    
     if (isSignUp && !name) {
       setError('Please enter your full name');
       return false;
     }
-
     if (password.length < 6) {
       setError('Password must be at least 6 characters long');
       return false;
     }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setError('Please enter a valid email address');
       return false;
     }
-
     return true;
   };
-
   const linkDoctorAccount = async (userId: string, userEmail: string) => {
     try {
       // Check if there's an existing doctor record with this email
-      const { data: existingDoctor, error: doctorError } = await supabase
-        .from('doctors')
-        .select('*')
-        .eq('email', userEmail.toLowerCase())
-        .single();
-
+      const {
+        data: existingDoctor,
+        error: doctorError
+      } = await supabase.from('doctors').select('*').eq('email', userEmail.toLowerCase()).single();
       if (doctorError && doctorError.code !== 'PGRST116') {
         console.error('Error checking for existing doctor:', doctorError);
         return;
       }
-
       if (existingDoctor && !existingDoctor.auth_user_id) {
         // Link the existing doctor record to the new auth user
-        const { error: updateError } = await supabase
-          .from('doctors')
-          .update({ 
-            auth_user_id: userId,
-            first_login_at: new Date().toISOString(),
-            account_setup_completed: true
-          })
-          .eq('id', existingDoctor.id);
-
+        const {
+          error: updateError
+        } = await supabase.from('doctors').update({
+          auth_user_id: userId,
+          first_login_at: new Date().toISOString(),
+          account_setup_completed: true
+        }).eq('id', existingDoctor.id);
         if (updateError) {
           console.error('Error linking doctor account:', updateError);
         } else {
           console.log('Successfully linked doctor account');
           toast({
             title: "Account Linked",
-            description: "Your account has been successfully linked to your doctor profile.",
+            description: "Your account has been successfully linked to your doctor profile."
           });
         }
       }
@@ -98,28 +90,26 @@ const Auth = () => {
       console.error('Error in linkDoctorAccount:', error);
     }
   };
-
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm(true)) return;
-
     setLoading(true);
     setError('');
-
     try {
       const redirectUrl = `${window.location.origin}/doctor`;
-      
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const {
+        data,
+        error: signUpError
+      } = await supabase.auth.signUp({
         email: email.toLowerCase(),
         password,
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            full_name: name,
+            full_name: name
           }
         }
       });
-
       if (signUpError) {
         if (signUpError.message.includes('already registered')) {
           setError('An account with this email already exists. Please sign in instead.');
@@ -129,16 +119,13 @@ const Auth = () => {
         }
         return;
       }
-
       if (data.user) {
         // Try to link to existing doctor record
         await linkDoctorAccount(data.user.id, email);
-        
         toast({
           title: "Account Created",
-          description: "Please check your email to verify your account, then you can sign in.",
+          description: "Please check your email to verify your account, then you can sign in."
         });
-        
         setActiveTab('signin');
         setPassword('');
       }
@@ -148,20 +135,19 @@ const Auth = () => {
       setLoading(false);
     }
   };
-
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm(false)) return;
-
     setLoading(true);
     setError('');
-
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const {
+        data,
+        error: signInError
+      } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase(),
-        password,
+        password
       });
-
       if (signInError) {
         if (signInError.message.includes('Invalid login credentials')) {
           setError('Invalid email or password. Please check your credentials and try again.');
@@ -172,16 +158,14 @@ const Auth = () => {
         }
         return;
       }
-
       if (data.user) {
         // Try to link to existing doctor record if not already linked
         await linkDoctorAccount(data.user.id, email);
-        
         toast({
           title: "Welcome back!",
-          description: "You have been successfully signed in.",
+          description: "You have been successfully signed in."
         });
-        
+
         // Redirect will be handled by useEffect
       }
     } catch (error: any) {
@@ -190,16 +174,11 @@ const Auth = () => {
       setLoading(false);
     }
   };
-
-  return (
-    <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
+  return <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Home
-          </Link>
+          
           <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
             Call Schedule Portal
           </h1>
@@ -222,12 +201,10 @@ const Auth = () => {
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
 
-              {error && (
-                <Alert variant="destructive">
+              {error && <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+                </Alert>}
 
               <TabsContent value="signin" className="space-y-4">
                 <form onSubmit={handleSignIn} className="space-y-4">
@@ -235,30 +212,14 @@ const Auth = () => {
                     <Label htmlFor="signin-email">Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                      <Input
-                        id="signin-email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
+                      <Input id="signin-email" type="email" placeholder="Enter your email" value={email} onChange={e => setEmail(e.target.value)} className="pl-10" required />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signin-password">Password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                      <Input
-                        id="signin-password"
-                        type="password"
-                        placeholder="Enter your password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
+                      <Input id="signin-password" type="password" placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} className="pl-10" required />
                     </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
@@ -273,45 +234,21 @@ const Auth = () => {
                     <Label htmlFor="signup-name">Full Name</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                      <Input
-                        id="signup-name"
-                        type="text"
-                        placeholder="Enter your full name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
+                      <Input id="signup-name" type="text" placeholder="Enter your full name" value={name} onChange={e => setName(e.target.value)} className="pl-10" required />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
+                      <Input id="signup-email" type="email" placeholder="Enter your email" value={email} onChange={e => setEmail(e.target.value)} className="pl-10" required />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="Create a password (min. 6 characters)"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="pl-10"
-                        required
-                      />
+                      <Input id="signup-password" type="password" placeholder="Create a password (min. 6 characters)" value={password} onChange={e => setPassword(e.target.value)} className="pl-10" required />
                     </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
@@ -332,8 +269,6 @@ const Auth = () => {
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default Auth;
