@@ -815,7 +815,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     }).join(', ');
   };
 
-  const handleSendReminders = () => {
+  const handleSendReminders = async () => {
     console.log('🟢 handleSendReminders called');
     
     if (!currentBlock) {
@@ -833,96 +833,80 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     const nonSubmitters = doctors.filter(doctor => {
       const request = doctorRequests.find(req => req.doctor_id === doctor.id && req.block_id === currentBlock.id);
       return !request || request.status === 'not_started';
-    }).filter(doctor => doctor.active && doctor.mobile); // Only include active doctors with mobile numbers
+    }).filter(doctor => doctor.active && doctor.email); // Only include active doctors with email addresses
     
-    console.log('📱 Non-submitters with mobile:', nonSubmitters.map(d => ({ name: d.name, mobile: d.mobile })));
+    console.log('📧 Non-submitters with email:', nonSubmitters.map(d => ({ name: d.name, email: d.email })));
     
     if (nonSubmitters.length === 0) {
       console.log('⚠️ No reminders needed');
       toast({
         title: "No Reminders Needed",
-        description: "All active doctors with mobile numbers have already submitted their requests.",
+        description: "All active doctors with email addresses have already submitted their requests.",
       });
       return;
     }
     
     const blockDates = `${format(parseLocalDate(currentBlock.start_monday_date), 'MMMM d')} - ${format(parseLocalDate(currentBlock.end_sunday_date), 'MMMM d, yyyy')}`;
-    const deadlineText = currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMMM d, yyyy') : 'soon';
+    const deadlineText = currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMMM d, yyyy') : 'TBD';
     
-    const message = `Hi! This is a friendly reminder that we need your call schedule preferences for the upcoming call block:
-
-📅 Call Block Dates: ${blockDates}
-⏰ Submission Deadline: ${deadlineText}
-
-Please log into the call scheduling system to submit:
-• Your unavailable dates
-• Your preferred weekend call preferences  
-• Any additional notes or special requests
-
-Your input is essential for creating a fair and balanced call schedule for everyone.
-
-If you have any questions or technical difficulties, please don't hesitate to reach out.
-
-Thank you!`;
-
-    // Format phone number for WhatsApp (remove non-digits, ensure it starts with country code)
-    const formatPhoneForWhatsApp = (phone: string) => {
-      console.log('📞 Formatting phone:', phone);
-      // Remove all non-digit characters
-      const digits = phone.replace(/\D/g, '');
-      console.log('📞 Digits only:', digits);
-      // If it starts with 1 and is 11 digits, it's already formatted for US
-      if (digits.startsWith('1') && digits.length === 11) {
-        return digits;
-      }
-      // If it's 10 digits, add US country code
-      if (digits.length === 10) {
-        return '1' + digits;
-      }
-      return digits; // Return as-is if different format
-    };
-
-    // Generate WhatsApp links for each doctor
-    const whatsappLinks = nonSubmitters.map(doctor => {
-      const formattedPhone = formatPhoneForWhatsApp(doctor.mobile);
-      const encodedMessage = encodeURIComponent(message);
-      const link = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
-      console.log(`🔗 WhatsApp link for ${doctor.name}:`, link);
-      return {
-        doctor: doctor.name,
-        phone: doctor.mobile,
-        link: link
-      };
-    });
-
-    // Show success message
     toast({
-      title: `WhatsApp Reminders Ready`,
-      description: `Opening WhatsApp for ${nonSubmitters.length} doctors: ${nonSubmitters.map(d => d.name).join(', ')}`,
+      title: "Sending Email Reminders",
+      description: `Sending reminders to ${nonSubmitters.length} doctors...`,
     });
 
-    console.log('🚀 About to open WhatsApp links:', whatsappLinks.length);
+    let successCount = 0;
+    let errorCount = 0;
 
-    // Open WhatsApp links with delay between each to avoid overwhelming the browser
-    whatsappLinks.forEach((item, index) => {
-      setTimeout(() => {
-        console.log(`📱 Opening WhatsApp for ${item.doctor} (${item.phone})`);
-        console.log(`🔗 Link: ${item.link}`);
-        window.open(item.link, '_blank');
-      }, index * 1000); // 1 second delay between each link
-    });
+    // Send emails with a small delay between each
+    for (const doctor of nonSubmitters) {
+      try {
+        console.log(`📧 Sending reminder email to ${doctor.name} (${doctor.email})`);
+        
+        const response = await supabase.functions.invoke('send-reminder-email', {
+          body: {
+            doctorName: doctor.name,
+            doctorEmail: doctor.email,
+            blockTitle: `${currentBlock.title} (${blockDates})`,
+            submissionDeadline: deadlineText,
+            doctorPortalUrl: `${window.location.origin}/doctor`
+          }
+        });
 
-    // Also show a summary in case some links don't open
-    setTimeout(() => {
-      const summary = whatsappLinks.map(item => 
-        `${item.doctor} (${item.phone}): ${item.link}`
-      ).join('\n\n');
-      
-      if (confirm(`${whatsappLinks.length} WhatsApp windows should have opened. If any didn't open, click OK to see the links.`)) {
-        console.log('📋 Showing summary to user');
-        alert(`WhatsApp Links:\n\n${summary}`);
+        if (response.error) {
+          console.error(`Failed to send email to ${doctor.name}:`, response.error);
+          errorCount++;
+        } else {
+          console.log(`✅ Email sent successfully to ${doctor.name}`);
+          successCount++;
+        }
+        
+        // Small delay between emails
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(`Error sending email to ${doctor.name}:`, error);
+        errorCount++;
       }
-    }, whatsappLinks.length * 1000 + 2000);
+    }
+
+    // Show final result
+    if (successCount > 0 && errorCount === 0) {
+      toast({
+        title: "Reminders Sent Successfully",
+        description: `Email reminders sent to ${successCount} doctors.`,
+      });
+    } else if (successCount > 0 && errorCount > 0) {
+      toast({
+        title: "Reminders Partially Sent",
+        description: `${successCount} emails sent successfully, ${errorCount} failed.`,
+        variant: "destructive"
+      });
+    } else {
+      toast({
+        title: "Failed to Send Reminders",
+        description: `Failed to send all ${errorCount} reminder emails. Please check the logs.`,
+        variant: "destructive"
+      });
+    }
   };
 
   // Edit request functions
