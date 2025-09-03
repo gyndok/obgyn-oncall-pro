@@ -148,12 +148,11 @@ const Auth = () => {
     setError('');
     
     try {
-      const redirectUrl = `${window.location.origin}/auth/reset-password`;
-      
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      // Generate a password reset token without sending Supabase's email
+      const { data, error: resetError } = await supabase.auth.resetPasswordForEmail(
         resetEmail.toLowerCase(),
         {
-          redirectTo: redirectUrl
+          redirectTo: `${window.location.origin}/auth/reset-password`
         }
       );
       
@@ -162,16 +161,17 @@ const Auth = () => {
         return;
       }
       
-      // Send custom email using our edge function
-      try {
-        await supabase.functions.invoke('send-password-reset', {
-          body: {
-            email: resetEmail.toLowerCase(),
-            resetLink: redirectUrl
-          }
-        });
-      } catch (emailError) {
-        console.warn('Custom email failed, but Supabase reset was sent:', emailError);
+      // Only send our custom email - the reset token is already generated
+      const { error: emailError } = await supabase.functions.invoke('send-password-reset', {
+        body: {
+          email: resetEmail.toLowerCase(),
+          resetLink: `${window.location.origin}/auth/reset-password`
+        }
+      });
+      
+      if (emailError) {
+        setError('Failed to send reset email. Please try again.');
+        return;
       }
       
       toast({
