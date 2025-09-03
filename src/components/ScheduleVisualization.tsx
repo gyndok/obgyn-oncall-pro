@@ -50,12 +50,19 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
       week.dayDates[dayKey] = assignment.date;
     });
     
-    // Calculate date ranges for each week
-    const blockStartDate = new Date(block.start_monday_date);
+    // Calculate date ranges for each week using actual assignment dates
     weekMap.forEach((week, weekIndex) => {
-      const weekStartDate = addDays(blockStartDate, (weekIndex - 1) * 7);
-      const weekEndDate = addDays(weekStartDate, 6);
-      week.dates = `${format(weekStartDate, 'MMM d')}-${format(weekEndDate, 'd')}`;
+      // Find Monday and Sunday dates for this week from actual assignments
+      const mondayDate = week.dayDates['mon'] ? new Date(week.dayDates['mon']) : null;
+      const sundayDate = week.dayDates['sun'] ? new Date(week.dayDates['sun']) : null;
+      
+      if (mondayDate && sundayDate) {
+        week.dates = `${format(mondayDate, 'MMM d')}-${format(sundayDate, 'd')}`;
+      } else if (mondayDate) {
+        // Calculate Sunday from Monday
+        const calculatedSunday = addDays(mondayDate, 6);
+        week.dates = `${format(mondayDate, 'MMM d')}-${format(calculatedSunday, 'd')}`;
+      }
       weeks.push(week);
     });
     
