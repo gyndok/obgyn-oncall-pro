@@ -77,10 +77,6 @@ const AdminDashboard = () => {
     notes: ""
   });
 
-  // Import schedule states
-  const [showImportDialog, setShowImportDialog] = useState(false);
-  const [importText, setImportText] = useState("");
-
   // State for tracking individual reminder sends
   const [reminderSends, setReminderSends] = useState<Record<string, {
     sentAt: number;
@@ -344,139 +340,6 @@ const AdminDashboard = () => {
       toast({
         title: "AI Schedule Generation Failed",
         description: error.message || "Failed to generate schedule. Check console for details.",
-        variant: "destructive"
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const importScheduleFromText = async () => {
-    if (!currentBlock || !importText.trim()) return;
-    
-    setSaving(true);
-    try {
-      console.log('📋 Importing schedule from text...');
-      
-      // Parse the JSON response from ChatGPT
-      let scheduleData;
-      try {
-        // Try to extract JSON from the text (ChatGPT often wraps it in markdown)
-        const jsonMatch = importText.match(/```json\n?([\s\S]*?)\n?```/) || 
-                         importText.match(/```\n?([\s\S]*?)\n?```/) ||
-                         [null, importText];
-        
-        const cleanJson = jsonMatch[1] || importText.trim();
-        scheduleData = JSON.parse(cleanJson);
-      } catch (parseError) {
-        console.error('Failed to parse imported text as JSON:', parseError);
-        toast({
-          title: "Import Failed",
-          description: "Invalid JSON format. Please paste a valid schedule response from ChatGPT.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Validate the structure - handle both old and new formats
-      let scheduleArray;
-      if (scheduleData.assignments && Array.isArray(scheduleData.assignments)) {
-        // New ChatGPT format
-        scheduleArray = scheduleData.assignments;
-      } else if (scheduleData.schedule && Array.isArray(scheduleData.schedule)) {
-        // Old format
-        scheduleArray = scheduleData.schedule;
-      } else {
-        toast({
-          title: "Import Failed", 
-          description: "Invalid schedule format. Expected 'assignments' or 'schedule' array in the response.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Convert the schedule data to assignments
-      const importedAssignments = scheduleArray.map((item: any) => {
-        // Find the doctor by name (more flexible matching)
-        const doctor = doctors.find(d => {
-          const doctorNameLower = d.name.toLowerCase();
-          const itemDoctorLower = (item.doctor || '').toLowerCase();
-          
-          // Try exact match first
-          if (doctorNameLower === itemDoctorLower) return true;
-          
-          // Try partial matches
-          if (doctorNameLower.includes(itemDoctorLower) || itemDoctorLower.includes(doctorNameLower)) return true;
-          
-          // Try matching by last name only
-          const doctorLastName = doctorNameLower.split(' ').pop() || '';
-          const itemLastName = itemDoctorLower.split(' ').pop() || '';
-          if (doctorLastName && itemLastName && doctorLastName === itemLastName) return true;
-          
-          return false;
-        });
-
-        if (!doctor) {
-          console.warn(`Doctor not found for: ${item.doctor}`);
-          return null;
-        }
-
-        const date = parseLocalDate(item.date); // Use parseLocalDate to avoid timezone issues
-        // Use the weekday from ChatGPT data instead of recalculating to avoid timezone issues
-        const dayName = item.weekday ? item.weekday : format(date, 'EEE');
-        const isWeekend = item.is_weekend ?? (dayName === 'Sat' || dayName === 'Sun');
-
-        return {
-          block_id: currentBlock.id,
-          week_index: item.week_index || item.week || 1,
-          date: format(date, 'yyyy-MM-dd'),
-          is_weekend: isWeekend,
-          weekday_name: dayName, // Use the original weekday from ChatGPT
-          doctor_id: doctor.id
-        };
-      }).filter(Boolean);
-
-      console.log(`📋 Processed ${importedAssignments.length} assignments from import`);
-
-      // Clear existing assignments for this block
-      const { error: deleteError } = await supabase
-        .from('assignments')
-        .delete()
-        .eq('block_id', currentBlock.id);
-
-      if (deleteError) throw deleteError;
-
-      // Insert the imported assignments
-      const { error: insertError } = await supabase
-        .from('assignments')
-        .insert(importedAssignments);
-
-      if (insertError) throw insertError;
-
-      // Refetch assignments for current block
-      if (currentBlock) {
-        const { data: assignmentsData, error: assignmentsError } = await supabase
-          .from('assignments')
-          .select(`*, doctors (name, email)`)
-          .eq('block_id', currentBlock.id);
-
-        if (assignmentsError) throw assignmentsError;
-        setAssignments(assignmentsData || []);
-      }
-
-      toast({
-        title: "Schedule Imported Successfully! 📋",
-        description: `Imported ${importedAssignments.length} assignments from ChatGPT response`
-      });
-
-      setShowImportDialog(false);
-      setImportText("");
-
-    } catch (error: any) {
-      console.error('Error importing schedule:', error);
-      toast({
-        title: "Import Failed",
-        description: error.message || "Failed to import schedule. Check console for details.",
         variant: "destructive"
       });
     } finally {
@@ -1185,10 +1048,10 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
       });
     } else {
       // Creating new request for doctor without one
-      setEditingRequest({ 
-        doctor_id: doctor.id, 
+      setEditingRequest({
+        doctor_id: doctor.id,
         block_id: currentBlock?.id,
-        isNew: true 
+        isNew: true
       });
       setEditRequestForm({
         unavailable_dates: [],
@@ -1213,7 +1076,9 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     try {
       if (editingRequest.isNew) {
         // Creating a new request
-        const { error } = await supabase.from('doctor_requests').insert({
+        const {
+          error
+        } = await supabase.from('doctor_requests').insert({
           doctor_id: editingRequest.doctor_id,
           block_id: editingRequest.block_id,
           unavailable_dates: editRequestForm.unavailable_dates.map(date => format(date, 'yyyy-MM-dd')),
@@ -1228,7 +1093,9 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
         });
       } else {
         // Updating existing request
-        const { error } = await supabase.from('doctor_requests').update({
+        const {
+          error
+        } = await supabase.from('doctor_requests').update({
           unavailable_dates: editRequestForm.unavailable_dates.map(date => format(date, 'yyyy-MM-dd')),
           preferred_weekends: editRequestForm.preferred_weekends,
           notes: editRequestForm.notes,
@@ -1502,12 +1369,12 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                                        {doctor.request ? 'Edit' : 'Create'}
                                      </Button>
                                      {doctor.status !== 'submitted' && (() => {
-                                       const buttonState = getReminderButtonState(doctor.id);
-                                       return <Button variant={buttonState.variant} size="sm" onClick={() => handleSendIndividualReminder(doctor)} disabled={!doctor.email || buttonState.disabled} className={buttonState.className}>
+                                const buttonState = getReminderButtonState(doctor.id);
+                                return <Button variant={buttonState.variant} size="sm" onClick={() => handleSendIndividualReminder(doctor)} disabled={!doctor.email || buttonState.disabled} className={buttonState.className}>
                                                 <Mail className="h-3 w-3 mr-1" />
                                                 {buttonState.text}
                                               </Button>;
-                                     })()}
+                              })()}
                                    </div>
                                  </TableCell>
                               </TableRow>
@@ -1643,10 +1510,6 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       <Play className="h-4 w-4 mr-2" />
                        {saving ? "Generating..." : "Generate AI Schedule"}
                     </Button>
-                    <Button onClick={() => setShowImportDialog(true)} variant="outline" disabled={saving}>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Import from ChatGPT
-                    </Button>
                     <Button variant="outline" disabled={assignments.length === 0}>
                       <Download className="h-4 w-4 mr-2" />
                       Export CSV
@@ -1669,6 +1532,15 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                         {generateAIPrompt()}
                       </pre>
                     </div>
+                    <div className="mt-4 p-3 bg-accent/10 border border-accent/20 rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <div className="h-2 w-2 rounded-full bg-green-500 mt-2 flex-shrink-0"></div>
+                          <div className="text-sm">
+                            <p className="font-medium text-green-700 mb-1">AI-Powered Scheduling Active</p>
+                            <p className="text-muted-foreground">This prompt is sent to DeepSeek when you click "Generate AI Schedule" to create optimal assignments based on doctor preferences.</p>
+                          </div>
+                         </div>
+                     </div>
                   </CardContent>
                 </Card>
 
@@ -1789,7 +1661,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     })} placeholder="doctor@example.com" />
                   </div>
                   <div>
-                    <Label htmlFor="doctor-mobile">Phone Number</Label>
+                    <Label htmlFor="doctor-mobile">AI Scheduling Prompt</Label>
                     <Input id="doctor-mobile" value={doctorForm.mobile} onChange={e => setDoctorForm({
                       ...doctorForm,
                       mobile: e.target.value
@@ -1969,53 +1841,6 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
             </Button>
             <Button onClick={saveEditedRequest} disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Import Schedule Dialog */}
-      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Import Schedule from ChatGPT</DialogTitle>
-            <DialogDescription>
-              Paste the JSON response from ChatGPT here to import the schedule directly.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="import-text">ChatGPT Response (JSON)</Label>
-              <Textarea
-                id="import-text"
-                placeholder="Paste the JSON response from ChatGPT here..."
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                className="min-h-[200px] font-mono text-sm"
-              />
-            </div>
-            <div className="text-sm text-muted-foreground">
-              <p className="mb-2">Expected format:</p>
-              <pre className="bg-muted/50 p-2 rounded text-xs overflow-x-auto">
-{`{
-  "schedule": [
-    {
-      "week": 1,
-      "date": "2024-01-01", 
-      "doctor": "Dr. Smith"
-    },
-    ...
-  ]
-}`}
-              </pre>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={importScheduleFromText} disabled={!importText.trim() || saving}>
-              {saving ? "Importing..." : "Import Schedule"}
             </Button>
           </DialogFooter>
         </DialogContent>
