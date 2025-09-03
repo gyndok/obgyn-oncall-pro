@@ -3,6 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 
+// Helper function to parse date-only strings as local dates (avoiding UTC timezone issues)
+const parseLocalDate = (dateString: string) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day); // month is 0-indexed
+};
+
 interface Assignment {
   id: string;
   date: string;
@@ -53,8 +59,8 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
     // Calculate date ranges for each week using actual assignment dates
     weekMap.forEach((week, weekIndex) => {
       // Find Monday and Sunday dates for this week from actual assignments
-      const mondayDate = week.dayDates['mon'] ? new Date(week.dayDates['mon']) : null;
-      const sundayDate = week.dayDates['sun'] ? new Date(week.dayDates['sun']) : null;
+      const mondayDate = week.dayDates['mon'] ? parseLocalDate(week.dayDates['mon']) : null;
+      const sundayDate = week.dayDates['sun'] ? parseLocalDate(week.dayDates['sun']) : null;
       
       if (mondayDate && sundayDate) {
         week.dates = `${format(mondayDate, 'MMM d')}-${format(sundayDate, 'd')}`;
@@ -89,12 +95,12 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
       const doctor = summary.get(doctorName);
       if (assignment.is_weekend && assignment.weekday_name === 'Fri') {
         // Weekend assignment (Friday of weekend block)
-        const weekStartDate = addDays(new Date(block.start_monday_date), (assignment.week_index - 1) * 7);
+        const weekStartDate = addDays(parseLocalDate(block.start_monday_date), (assignment.week_index - 1) * 7);
         const weekEndDate = addDays(weekStartDate, 6);
         doctor.weekend = `Week ${assignment.week_index} (${format(addDays(weekStartDate, 4), 'MMM d')}-${format(weekEndDate, 'd')})`;
       } else if (!assignment.is_weekend) {
         // Weekday assignment - show day and date like "Mon 11/3"
-        const assignmentDate = new Date(assignment.date);
+        const assignmentDate = parseLocalDate(assignment.date);
         doctor.weekdays.push(`${assignment.weekday_name} ${format(assignmentDate, 'M/d')}`);
       }
     });
@@ -157,7 +163,7 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
                      {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => {
                        const doctor = week.assignments[day];
                        const dayDate = week.dayDates[day];
-                       const formattedDate = dayDate ? format(new Date(dayDate), 'M/d') : '';
+                       const formattedDate = dayDate ? format(parseLocalDate(dayDate), 'M/d') : '';
                        
                        return (
                          <TableCell key={day} className={['fri', 'sat', 'sun'].includes(day) ? 'bg-accent/10' : ''}>
