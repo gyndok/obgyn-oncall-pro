@@ -148,8 +148,8 @@ const Auth = () => {
     setError('');
     
     try {
-      // Generate a password reset token without sending Supabase's email
-      const { data, error: resetError } = await supabase.auth.resetPasswordForEmail(
+      // Use Supabase's built-in reset email functionality
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         resetEmail.toLowerCase(),
         {
           redirectTo: `${window.location.origin}/auth/reset-password`
@@ -158,19 +158,6 @@ const Auth = () => {
       
       if (resetError) {
         setError(resetError.message);
-        return;
-      }
-      
-      // Only send our custom email - the reset token is already generated
-      const { error: emailError } = await supabase.functions.invoke('send-password-reset', {
-        body: {
-          email: resetEmail.toLowerCase(),
-          resetLink: `${window.location.origin}/auth/reset-password`
-        }
-      });
-      
-      if (emailError) {
-        setError('Failed to send reset email. Please try again.');
         return;
       }
       
