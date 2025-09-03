@@ -70,7 +70,7 @@ RESPONSE FORMAT (REQUIRED):
       "date": "2025-11-03",
       "doctor_name": "Klein",
       "is_weekend": false,
-      "weekday_name": "Monday",
+      "weekday_name": "Mon",
       "week_index": 1
     },
     ...
@@ -90,6 +90,7 @@ CRITICAL REQUIREMENTS:
 - Each doctor gets exactly 4 weekdays (Mon-Thu)
 - LeBlanc never gets Tuesday
 - Use exact doctor names: Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson
+- Use abbreviated weekday names: Mon, Tue, Wed, Thu, Fri, Sat, Sun
 - Dates must be in YYYY-MM-DD format
 - Respond ONLY with valid JSON, no other text`
           },
