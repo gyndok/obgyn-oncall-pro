@@ -295,32 +295,47 @@ const AdminDashboard = () => {
 
     setSaving(true);
     try {
-      // Simple schedule generation algorithm
-      const blockStart = parseLocalDate(currentBlock.start_monday_date);
-      const assignments = [];
-      const availableDoctors = [...doctors];
+      console.log('🤖 Generating AI-powered schedule...');
+      
+      // Generate the AI prompt with all doctor preferences
+      const aiPrompt = generateAIPrompt();
+      
+      // Prepare doctor data for the AI function
+      const doctorData = doctors.map(doctor => ({
+        id: doctor.id,
+        name: doctor.name
+      }));
 
-      // Create assignments for each day of the 7-week block
-      for (let week = 0; week < 7; week++) {
-        for (let day = 0; day < 7; day++) {
-          const currentDate = addDays(addWeeks(blockStart, week), day);
-          const isWeekend = day >= 5; // Friday, Saturday, Sunday
-          const weekdayName = format(currentDate, 'EEEE');
-
-          // Simple round-robin assignment (in real app, this would consider preferences)
-          const doctorIndex = (week * 7 + day) % availableDoctors.length;
-          const assignedDoctor = availableDoctors[doctorIndex];
-
-          assignments.push({
-            block_id: currentBlock.id,
-            week_index: week,
-            date: format(currentDate, 'yyyy-MM-dd'),
-            is_weekend: isWeekend,
-            weekday_name: weekdayName,
-            doctor_id: assignedDoctor.id
-          });
+      // Call the AI scheduling edge function
+      const response = await supabase.functions.invoke('generate-ai-schedule', {
+        body: {
+          prompt: aiPrompt,
+          blockStartDate: currentBlock.start_monday_date,
+          doctors: doctorData
         }
+      });
+
+      if (response.error) {
+        console.error('AI scheduling error:', response.error);
+        throw new Error(response.error.message || 'Failed to generate AI schedule');
       }
+
+      const { assignments: aiAssignments, summary } = response.data;
+      
+      if (!aiAssignments || aiAssignments.length === 0) {
+        throw new Error('AI returned no assignments');
+      }
+
+      console.log(`📋 AI generated ${aiAssignments.length} assignments`);
+      if (summary) {
+        console.log('📊 Schedule summary:', summary);
+      }
+
+      // Add block_id to each assignment
+      const assignmentsWithBlockId = aiAssignments.map((assignment: any) => ({
+        ...assignment,
+        block_id: currentBlock.id
+      }));
 
       // Clear existing assignments for this block
       const { error: deleteError } = await supabase
@@ -330,24 +345,24 @@ const AdminDashboard = () => {
 
       if (deleteError) throw deleteError;
 
-      // Insert new assignments
+      // Insert new AI-generated assignments
       const { error: insertError } = await supabase
         .from('assignments')
-        .insert(assignments);
+        .insert(assignmentsWithBlockId);
 
       if (insertError) throw insertError;
 
       toast({
-        title: "Success",
-        description: "Schedule generated successfully",
+        title: "AI Schedule Generated Successfully! 🤖",
+        description: `Created ${aiAssignments.length} assignments using ChatGPT with doctor preferences`,
       });
 
       fetchData();
-    } catch (error) {
-      console.error('Error generating schedule:', error);
+    } catch (error: any) {
+      console.error('Error generating AI schedule:', error);
       toast({
-        title: "Error",
-        description: "Failed to generate schedule",
+        title: "AI Schedule Generation Failed",
+        description: error.message || "Failed to generate schedule. Check console for details.",
         variant: "destructive"
       });
     } finally {
@@ -1194,7 +1209,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Manage call blocks, monitor submissions, and generate schedules</p>
+            <p className="text-muted-foreground">Manage call blocks, monitor submissions, and generate AI-powered schedules</p>
           </div>
           <div className="flex items-center gap-2">
             <Button 
@@ -1662,8 +1677,8 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
               <>
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold">Schedule Generation</h2>
-                    <p className="text-muted-foreground">Generate and validate the call schedule</p>
+                    <h2 className="text-2xl font-bold">AI Schedule Generation</h2>
+                    <p className="text-muted-foreground">Generate intelligent call schedules using ChatGPT with doctor preferences</p>
                   </div>
                   <div className="flex gap-2">
                     <Button 
@@ -1672,7 +1687,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       className="bg-gradient-primary hover:opacity-90"
                     >
                       <Play className="h-4 w-4 mr-2" />
-                      {saving ? "Generating..." : "Generate Schedule"}
+                       {saving ? "Generating..." : "Generate AI Schedule"}
                     </Button>
                     <Button variant="outline" disabled={assignments.length === 0}>
                       <Download className="h-4 w-4 mr-2" />
@@ -1689,7 +1704,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       AI Scheduling Prompt Preview
                     </CardTitle>
                     <CardDescription>
-                      This is the prompt that would be sent to AI for intelligent schedule generation
+                      This prompt is sent to ChatGPT to generate intelligent schedules
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -1699,17 +1714,16 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       </pre>
                     </div>
                     <div className="mt-4 p-3 bg-accent/10 border border-accent/20 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <div className="h-2 w-2 rounded-full bg-accent mt-2 flex-shrink-0"></div>
-                        <div className="text-sm">
-                          <p className="font-medium text-accent mb-1">Future Enhancement</p>
-                          <p className="text-muted-foreground">
-                            This prompt will be used when AI-powered scheduling is implemented. 
-                            Currently using simple round-robin assignment.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                        <div className="flex items-start gap-3">
+                          <div className="h-2 w-2 rounded-full bg-green-500 mt-2 flex-shrink-0"></div>
+                          <div className="text-sm">
+                            <p className="font-medium text-green-700 mb-1">AI-Powered Scheduling Active</p>
+                            <p className="text-muted-foreground">
+                              This prompt is sent to ChatGPT when you click "Generate AI Schedule" to create optimal assignments based on doctor preferences.
+                            </p>
+                          </div>
+                         </div>
+                     </div>
                   </CardContent>
                 </Card>
 
@@ -1720,11 +1734,11 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     <CardContent className="py-16 text-center">
                        <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                        <h3 className="text-xl font-semibold mb-2">No Schedule Generated</h3>
-                       <p className="text-muted-foreground mb-4">
-                         Generate a schedule to assign doctors to call duties
-                       </p>
+                        <p className="text-muted-foreground mb-4">
+                          Generate an AI-powered schedule using ChatGPT to assign doctors optimally
+                        </p>
                        <Button onClick={generateSchedule} disabled={saving}>
-                         {saving ? "Generating..." : "Generate Schedule"}
+                         {saving ? "Generating..." : "Generate AI Schedule"}
                        </Button>
                      </CardContent>
                    </Card>
