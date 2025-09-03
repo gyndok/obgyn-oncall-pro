@@ -422,15 +422,15 @@ const AdminDashboard = () => {
         }
 
         const date = new Date(item.date);
-        const dayName = format(date, 'EEEE');
-        const isWeekend = item.is_weekend ?? (dayName === 'Saturday' || dayName === 'Sunday');
+        const dayName = format(date, 'EEE'); // Use abbreviated format: Mon, Tue, Wed, etc.
+        const isWeekend = item.is_weekend ?? (dayName === 'Sat' || dayName === 'Sun');
 
         return {
           block_id: currentBlock.id,
           week_index: item.week_index || item.week || 1,
           date: format(date, 'yyyy-MM-dd'),
           is_weekend: isWeekend,
-          weekday_name: dayName, // Use the full day name from the date
+          weekday_name: dayName, // Now using abbreviated format
           doctor_id: doctor.id
         };
       }).filter(Boolean);

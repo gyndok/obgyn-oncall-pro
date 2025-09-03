@@ -45,7 +45,7 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
       }
       
       const week = weekMap.get(weekIndex);
-      const dayKey = assignment.weekday_name.toLowerCase();
+      const dayKey = assignment.weekday_name.toLowerCase(); // Convert 'Mon' to 'mon', etc.
       week.assignments[dayKey] = assignment.doctors.name;
       week.dayDates[dayKey] = assignment.date;
     });
@@ -147,13 +147,13 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
                         <div className="text-xs text-muted-foreground">{week.dates}</div>
                       </div>
                     </TableCell>
-                     {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
+                     {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => {
                        const doctor = week.assignments[day];
                        const dayDate = week.dayDates[day];
                        const formattedDate = dayDate ? format(new Date(dayDate), 'M/d') : '';
                        
                        return (
-                         <TableCell key={day} className={isWeekend(day) ? 'bg-accent/10' : ''}>
+                         <TableCell key={day} className={['fri', 'sat', 'sun'].includes(day) ? 'bg-accent/10' : ''}>
                            {doctor ? (
                              <div className="text-center space-y-1">
                                <div className="text-xs text-muted-foreground font-medium">
@@ -162,7 +162,7 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
                                <Badge 
                                  variant="outline" 
                                  className={`${getDoctorColor(doctor as string)} font-medium ${
-                                   isWeekend(day) ? 'ring-2 ring-accent/30' : ''
+                                   ['fri', 'sat', 'sun'].includes(day) ? 'ring-2 ring-accent/30' : ''
                                  }`}
                                >
                                  {(doctor as string).replace('Dr. ', '')}
