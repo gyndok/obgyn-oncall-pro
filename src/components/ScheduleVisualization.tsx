@@ -38,6 +38,8 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
     const weeks: any[] = [];
     const weekMap = new Map();
     
+    console.log('Raw assignments:', assignments);
+    
     // Group assignments by week
     assignments.forEach(assignment => {
       const weekIndex = assignment.week_index;
@@ -52,15 +54,20 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
       
       const week = weekMap.get(weekIndex);
       const dayKey = assignment.weekday_name.toLowerCase(); // Convert 'Mon' to 'mon', etc.
+      console.log(`Processing: Week ${weekIndex}, Day ${dayKey}, Date ${assignment.date}, Doctor ${assignment.doctors.name}`);
       week.assignments[dayKey] = assignment.doctors.name;
       week.dayDates[dayKey] = assignment.date;
     });
+    
+    console.log('Week map after processing:', Array.from(weekMap.entries()));
     
     // Calculate date ranges for each week using actual assignment dates
     weekMap.forEach((week, weekIndex) => {
       // Find Monday and Sunday dates for this week from actual assignments
       const mondayDate = week.dayDates['mon'] ? parseLocalDate(week.dayDates['mon']) : null;
       const sundayDate = week.dayDates['sun'] ? parseLocalDate(week.dayDates['sun']) : null;
+      
+      console.log(`Week ${weekIndex}: Monday = ${week.dayDates['mon']}, Sunday = ${week.dayDates['sun']}`);
       
       if (mondayDate && sundayDate) {
         week.dates = `${format(mondayDate, 'MMM d')}-${format(sundayDate, 'd')}`;
