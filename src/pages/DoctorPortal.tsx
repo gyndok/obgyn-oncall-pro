@@ -846,14 +846,7 @@ const DoctorPortal = () => {
                    {/* Setup Instructions */}
                   <Alert className="mt-6">
                     <CalendarIcon className="h-4 w-4" />
-                    <AlertDescription>
-                      <strong>Google Calendar Integration:</strong> This calendar displays events from 2 Google Calendars. 
-                      To configure, update the calendar IDs in the code with your actual Google Calendar IDs.
-                      <br /><br />
-                      <Button variant="outline" size="sm" onClick={fetchCalendarEvents} className="mt-2">
-                        Refresh Calendar
-                      </Button>
-                    </AlertDescription>
+                    
                   </Alert>
 
                   {calendarLoading && <div className="text-center py-8">
