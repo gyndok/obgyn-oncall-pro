@@ -147,25 +147,35 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
                         <div className="text-xs text-muted-foreground">{week.dates}</div>
                       </div>
                     </TableCell>
-                     {Object.entries(week.assignments).map(([day, doctor]) => {
+                     {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
+                       const doctor = week.assignments[day];
                        const dayDate = week.dayDates[day];
                        const formattedDate = dayDate ? format(new Date(dayDate), 'M/d') : '';
                        
                        return (
                          <TableCell key={day} className={isWeekend(day) ? 'bg-accent/10' : ''}>
-                           <div className="text-center space-y-1">
-                             <div className="text-xs text-muted-foreground font-medium">
-                               {formattedDate}
+                           {doctor ? (
+                             <div className="text-center space-y-1">
+                               <div className="text-xs text-muted-foreground font-medium">
+                                 {formattedDate}
+                               </div>
+                               <Badge 
+                                 variant="outline" 
+                                 className={`${getDoctorColor(doctor as string)} font-medium ${
+                                   isWeekend(day) ? 'ring-2 ring-accent/30' : ''
+                                 }`}
+                               >
+                                 {(doctor as string).replace('Dr. ', '')}
+                               </Badge>
                              </div>
-                             <Badge 
-                               variant="outline" 
-                               className={`${getDoctorColor(doctor as string)} font-medium ${
-                                 isWeekend(day) ? 'ring-2 ring-accent/30' : ''
-                               }`}
-                             >
-                               {(doctor as string).replace('Dr. ', '')}
-                             </Badge>
-                           </div>
+                           ) : (
+                             <div className="text-center space-y-1">
+                               <div className="text-xs text-muted-foreground font-medium">
+                                 {formattedDate}
+                               </div>
+                               <div className="text-xs text-muted-foreground">No assignment</div>
+                             </div>
+                           )}
                          </TableCell>
                        );
                      })}
