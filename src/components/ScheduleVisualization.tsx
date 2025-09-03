@@ -1,128 +1,115 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 
-const ScheduleVisualization = () => {
-  // Mock schedule data (would come from backend)
-  const schedule = [
-    {
-      week: 1,
-      dates: "Feb 5-11",
-      assignments: {
-        monday: "Dr. Klein",
-        tuesday: "Dr. Johnson", 
-        wednesday: "Dr. Kenney",
-        thursday: "Dr. LaBerge",
-        friday: "Dr. LeBlanc",
-        saturday: "Dr. LeBlanc", 
-        sunday: "Dr. LeBlanc"
-      }
-    },
-    {
-      week: 2,
-      dates: "Feb 12-18",
-      assignments: {
-        monday: "Dr. Clinger",
-        tuesday: "Dr. Demerson",
-        wednesday: "Dr. Klein", 
-        thursday: "Dr. Johnson",
-        friday: "Dr. Kenney",
-        saturday: "Dr. Kenney",
-        sunday: "Dr. Kenney"
-      }
-    },
-    {
-      week: 3,
-      dates: "Feb 19-25", 
-      assignments: {
-        monday: "Dr. LaBerge",
-        tuesday: "Dr. Klein",
-        wednesday: "Dr. Clinger",
-        thursday: "Dr. Demerson", 
-        friday: "Dr. Johnson",
-        saturday: "Dr. Johnson",
-        sunday: "Dr. Johnson"
-      }
-    },
-    {
-      week: 4,
-      dates: "Feb 26-Mar 3",
-      assignments: {
-        monday: "Dr. Kenney",
-        tuesday: "Dr. LaBerge", 
-        wednesday: "Dr. LeBlanc",
-        thursday: "Dr. Klein",
-        friday: "Dr. Clinger",
-        saturday: "Dr. Clinger",
-        sunday: "Dr. Clinger" 
-      }
-    },
-    {
-      week: 5,
-      dates: "Mar 4-10",
-      assignments: {
-        monday: "Dr. Johnson",
-        tuesday: "Dr. Clinger",
-        wednesday: "Dr. Demerson",
-        thursday: "Dr. LeBlanc",
-        friday: "Dr. LaBerge", 
-        saturday: "Dr. LaBerge",
-        sunday: "Dr. LaBerge"
-      }
-    },
-    {
-      week: 6,
-      dates: "Mar 11-17",
-      assignments: {
-        monday: "Dr. Demerson", 
-        tuesday: "Dr. Kenney",
-        wednesday: "Dr. Johnson",
-        thursday: "Dr. Clinger",
-        friday: "Dr. Demerson",
-        saturday: "Dr. Demerson", 
-        sunday: "Dr. Demerson"
-      }
-    },
-    {
-      week: 7,
-      dates: "Mar 18-24",
-      assignments: {
-        monday: "Dr. LeBlanc",
-        tuesday: "Dr. Johnson",
-        wednesday: "Dr. LaBerge", 
-        thursday: "Dr. Kenney",
-        friday: "Dr. Klein",
-        saturday: "Dr. Klein",
-        sunday: "Dr. Klein"
-      }
-    }
-  ];
+interface Assignment {
+  id: string;
+  date: string;
+  weekday_name: string;
+  week_index: number;
+  is_weekend: boolean;
+  doctor_id: string;
+  doctors: {
+    name: string;
+    email: string;
+  };
+}
 
-  const doctorSummary = [
-    { name: "Dr. Klein", weekend: "Week 7 (Mar 22-24)", weekdays: ["Week 1 Mon", "Week 2 Wed", "Week 3 Tue", "Week 4 Thu"] },
-    { name: "Dr. LeBlanc", weekend: "Week 1 (Feb 9-11)", weekdays: ["Week 3 Wed", "Week 4 Wed", "Week 5 Thu", "Week 7 Mon"] },
-    { name: "Dr. Johnson", weekend: "Week 3 (Feb 23-25)", weekdays: ["Week 1 Tue", "Week 2 Thu", "Week 5 Mon", "Week 7 Tue"] },
-    { name: "Dr. Kenney", weekend: "Week 2 (Feb 16-18)", weekdays: ["Week 1 Wed", "Week 4 Mon", "Week 6 Tue", "Week 7 Thu"] },
-    { name: "Dr. LaBerge", weekend: "Week 5 (Mar 8-10)", weekdays: ["Week 1 Thu", "Week 3 Mon", "Week 4 Tue", "Week 7 Wed"] },
-    { name: "Dr. Clinger", weekend: "Week 4 (Mar 1-3)", weekdays: ["Week 2 Mon", "Week 3 Wed", "Week 5 Tue", "Week 6 Thu"] },
-    { name: "Dr. Demerson", weekend: "Week 6 (Mar 15-17)", weekdays: ["Week 2 Tue", "Week 3 Thu", "Week 5 Wed", "Week 6 Mon"] }
-  ];
+interface Block {
+  start_monday_date: string;
+  end_sunday_date: string;
+}
+
+interface ScheduleVisualizationProps {
+  assignments: Assignment[];
+  block: Block;
+}
+
+const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProps) => {
+  // Process assignments into week-based structure
+  const weeklySchedule = () => {
+    const weeks: any[] = [];
+    const weekMap = new Map();
+    
+    // Group assignments by week
+    assignments.forEach(assignment => {
+      const weekIndex = assignment.week_index;
+      if (!weekMap.has(weekIndex)) {
+        weekMap.set(weekIndex, {
+          week: weekIndex,
+          dates: "",
+          assignments: {}
+        });
+      }
+      
+      const week = weekMap.get(weekIndex);
+      const dayKey = assignment.weekday_name.toLowerCase();
+      week.assignments[dayKey] = assignment.doctors.name;
+    });
+    
+    // Calculate date ranges for each week
+    const blockStartDate = new Date(block.start_monday_date);
+    weekMap.forEach((week, weekIndex) => {
+      const weekStartDate = addDays(blockStartDate, (weekIndex - 1) * 7);
+      const weekEndDate = addDays(weekStartDate, 6);
+      week.dates = `${format(weekStartDate, 'MMM d')}-${format(weekEndDate, 'd')}`;
+      weeks.push(week);
+    });
+    
+    // Sort by week number
+    return weeks.sort((a, b) => a.week - b.week);
+  };
+
+  const schedule = weeklySchedule();
+
+  // Generate doctor summary
+  const doctorSummary = () => {
+    const summary = new Map();
+    
+    assignments.forEach(assignment => {
+      const doctorName = assignment.doctors.name;
+      if (!summary.has(doctorName)) {
+        summary.set(doctorName, {
+          name: doctorName,
+          weekend: "",
+          weekdays: []
+        });
+      }
+      
+      const doctor = summary.get(doctorName);
+      if (assignment.is_weekend && assignment.weekday_name === 'Fri') {
+        // Weekend assignment (Friday of weekend block)
+        const weekStartDate = addDays(new Date(block.start_monday_date), (assignment.week_index - 1) * 7);
+        const weekEndDate = addDays(weekStartDate, 6);
+        doctor.weekend = `Week ${assignment.week_index} (${format(addDays(weekStartDate, 4), 'MMM d')}-${format(weekEndDate, 'd')})`;
+      } else if (!assignment.is_weekend) {
+        // Weekday assignment
+        doctor.weekdays.push(`Week ${assignment.week_index} ${assignment.weekday_name}`);
+      }
+    });
+    
+    return Array.from(summary.values());
+  };
+
+  const doctorSummaryData = doctorSummary();
 
   const isWeekend = (day: string) => {
     return ['friday', 'saturday', 'sunday'].includes(day);
   };
 
   const getDoctorColor = (doctorName: string) => {
+    const name = doctorName.replace('Dr. ', '');
     const colors = {
-      "Dr. Klein": "bg-blue-100 text-blue-800 border-blue-200",
-      "Dr. LeBlanc": "bg-green-100 text-green-800 border-green-200", 
-      "Dr. Johnson": "bg-purple-100 text-purple-800 border-purple-200",
-      "Dr. Kenney": "bg-orange-100 text-orange-800 border-orange-200",
-      "Dr. LaBerge": "bg-red-100 text-red-800 border-red-200",
-      "Dr. Clinger": "bg-yellow-100 text-yellow-800 border-yellow-200",
-      "Dr. Demerson": "bg-pink-100 text-pink-800 border-pink-200"
+      "Klein": "bg-blue-100 text-blue-800 border-blue-200",
+      "LeBlanc": "bg-green-100 text-green-800 border-green-200", 
+      "Johnson": "bg-purple-100 text-purple-800 border-purple-200",
+      "Kenney": "bg-orange-100 text-orange-800 border-orange-200",
+      "LaBerge": "bg-red-100 text-red-800 border-red-200",
+      "Clinger": "bg-yellow-100 text-yellow-800 border-yellow-200",
+      "Demerson": "bg-pink-100 text-pink-800 border-pink-200"
     };
-    return colors[doctorName as keyof typeof colors] || "bg-gray-100 text-gray-800 border-gray-200";
+    return colors[name as keyof typeof colors] || "bg-gray-100 text-gray-800 border-gray-200";
   };
 
   return (
@@ -157,18 +144,18 @@ const ScheduleVisualization = () => {
                         <div className="text-xs text-muted-foreground">{week.dates}</div>
                       </div>
                     </TableCell>
-                    {Object.entries(week.assignments).map(([day, doctor]) => (
-                      <TableCell key={day} className={isWeekend(day) ? 'bg-accent/10' : ''}>
-                        <Badge 
-                          variant="outline" 
-                          className={`${getDoctorColor(doctor)} font-medium ${
-                            isWeekend(day) ? 'ring-2 ring-accent/30' : ''
-                          }`}
-                        >
-                          {doctor.replace('Dr. ', '')}
-                        </Badge>
-                      </TableCell>
-                    ))}
+                     {Object.entries(week.assignments).map(([day, doctor]) => (
+                       <TableCell key={day} className={isWeekend(day) ? 'bg-accent/10' : ''}>
+                          <Badge 
+                            variant="outline" 
+                            className={`${getDoctorColor(doctor as string)} font-medium ${
+                              isWeekend(day) ? 'ring-2 ring-accent/30' : ''
+                            }`}
+                          >
+                            {(doctor as string).replace('Dr. ', '')}
+                          </Badge>
+                       </TableCell>
+                     ))}
                   </TableRow>
                 ))}
               </TableBody>
@@ -185,7 +172,7 @@ const ScheduleVisualization = () => {
         </CardHeader>
         <CardContent>
           <div className="grid lg:grid-cols-2 gap-4">
-            {doctorSummary.map((doctor) => (
+            {doctorSummaryData.map((doctor: any) => (
               <div key={doctor.name} className="p-4 rounded-lg border border-border bg-gradient-card">
                 <h4 className="font-semibold mb-3">{doctor.name}</h4>
                 <div className="space-y-2">

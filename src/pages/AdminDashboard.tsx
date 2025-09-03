@@ -1728,7 +1728,10 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                 </Card>
 
                 {assignments.length > 0 ? (
-                  <ScheduleVisualization />
+                  <ScheduleVisualization 
+                    assignments={assignments} 
+                    block={currentBlock} 
+                  />
                 ) : (
                   <Card className="shadow-soft">
                     <CardContent className="py-16 text-center">
