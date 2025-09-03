@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { useFirstLoginTracker } from "./hooks/useFirstLoginTracker";
-import Index from "./pages/Index";
 import DoctorPortal from "./pages/DoctorPortal";
 import AdminDashboard from "./pages/AdminDashboard";
 import Auth from "./pages/Auth";
@@ -18,10 +17,9 @@ const AppContent = () => {
   
   return (
     <Routes>
-      <Route path="/" element={<Index />} />
+      <Route path="/" element={<Auth />} />
       <Route path="/doctor" element={<DoctorPortal />} />
       <Route path="/admin" element={<AdminDashboard />} />
-      <Route path="/auth" element={<Auth />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
