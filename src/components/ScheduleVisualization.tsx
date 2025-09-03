@@ -39,13 +39,15 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
         weekMap.set(weekIndex, {
           week: weekIndex,
           dates: "",
-          assignments: {}
+          assignments: {},
+          dayDates: {}
         });
       }
       
       const week = weekMap.get(weekIndex);
       const dayKey = assignment.weekday_name.toLowerCase();
       week.assignments[dayKey] = assignment.doctors.name;
+      week.dayDates[dayKey] = assignment.date;
     });
     
     // Calculate date ranges for each week
@@ -145,18 +147,28 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
                         <div className="text-xs text-muted-foreground">{week.dates}</div>
                       </div>
                     </TableCell>
-                     {Object.entries(week.assignments).map(([day, doctor]) => (
-                       <TableCell key={day} className={isWeekend(day) ? 'bg-accent/10' : ''}>
-                          <Badge 
-                            variant="outline" 
-                            className={`${getDoctorColor(doctor as string)} font-medium ${
-                              isWeekend(day) ? 'ring-2 ring-accent/30' : ''
-                            }`}
-                          >
-                            {(doctor as string).replace('Dr. ', '')}
-                          </Badge>
-                       </TableCell>
-                     ))}
+                     {Object.entries(week.assignments).map(([day, doctor]) => {
+                       const dayDate = week.dayDates[day];
+                       const formattedDate = dayDate ? format(new Date(dayDate), 'M/d') : '';
+                       
+                       return (
+                         <TableCell key={day} className={isWeekend(day) ? 'bg-accent/10' : ''}>
+                           <div className="text-center space-y-1">
+                             <div className="text-xs text-muted-foreground font-medium">
+                               {formattedDate}
+                             </div>
+                             <Badge 
+                               variant="outline" 
+                               className={`${getDoctorColor(doctor as string)} font-medium ${
+                                 isWeekend(day) ? 'ring-2 ring-accent/30' : ''
+                               }`}
+                             >
+                               {(doctor as string).replace('Dr. ', '')}
+                             </Badge>
+                           </div>
+                         </TableCell>
+                       );
+                     })}
                   </TableRow>
                 ))}
               </TableBody>
