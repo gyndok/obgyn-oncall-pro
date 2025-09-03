@@ -909,6 +909,45 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     }
   };
 
+  const handleSendTestEmail = async () => {
+    try {
+      console.log('📧 Sending test email to gyndok@yahoo.com');
+      
+      const response = await supabase.functions.invoke('send-reminder-email', {
+        body: {
+          doctorName: "Dr. Test User",
+          doctorEmail: "gyndok@yahoo.com",
+          blockTitle: "Test Call Block (November 3 - December 21, 2025)",
+          submissionDeadline: "September 15, 2025",
+          doctorPortalUrl: `${window.location.origin}/doctor`,
+          isTest: true
+        }
+      });
+
+      if (response.error) {
+        console.error('Failed to send test email:', response.error);
+        toast({
+          title: "Failed to Send Test Email",
+          description: "Please check the logs for details.",
+          variant: "destructive"
+        });
+      } else {
+        console.log('✅ Test email sent successfully');
+        toast({
+          title: "Test Email Sent",
+          description: "Check your inbox at gyndok@yahoo.com",
+        });
+      }
+    } catch (error) {
+      console.error('Error sending test email:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send test email",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Edit request functions
   const openEditRequestDialog = (doctor: any) => {
     if (!doctor.request) {
@@ -1228,6 +1267,14 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                         >
                           <Mail className="h-4 w-4 mr-2" />
                           Send Reminders
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={handleSendTestEmail}
+                        >
+                          <Mail className="h-4 w-4 mr-2" />
+                          Send Test Email
                         </Button>
                         <Button 
                           variant="outline" 

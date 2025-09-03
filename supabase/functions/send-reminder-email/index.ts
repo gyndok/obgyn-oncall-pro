@@ -15,6 +15,7 @@ interface ReminderEmailRequest {
   blockTitle: string;
   submissionDeadline: string;
   doctorPortalUrl: string;
+  isTest?: boolean;
 }
 
 const handler = async (req: Request): Promise<Response> => {
