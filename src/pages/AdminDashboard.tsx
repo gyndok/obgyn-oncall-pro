@@ -1674,7 +1674,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-2xl font-bold">AI Schedule Generation</h2>
-                    <p className="text-muted-foreground">Generate intelligent call schedules using DeepSeek with doctor preferences</p>
+                    
                   </div>
                   <div className="flex gap-2">
                     <Button onClick={generateSchedule} disabled={saving} className="bg-gradient-primary hover:opacity-90">
