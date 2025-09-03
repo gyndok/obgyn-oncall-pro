@@ -1038,20 +1038,27 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
 
   // Edit request functions
   const openEditRequestDialog = (doctor: any) => {
-    if (!doctor.request) {
-      toast({
-        title: "No Request Found",
-        description: "This doctor hasn't submitted a request yet.",
-        variant: "destructive"
+    if (doctor.request) {
+      // Editing existing request
+      setEditingRequest(doctor.request);
+      setEditRequestForm({
+        unavailable_dates: Array.isArray(doctor.request.unavailable_dates) ? doctor.request.unavailable_dates.map((date: string) => parseLocalDate(date)) : [],
+        preferred_weekends: Array.isArray(doctor.request.preferred_weekends) ? doctor.request.preferred_weekends : [],
+        notes: doctor.request.notes || ""
       });
-      return;
+    } else {
+      // Creating new request for doctor without one
+      setEditingRequest({ 
+        doctor_id: doctor.id, 
+        block_id: currentBlock?.id,
+        isNew: true 
+      });
+      setEditRequestForm({
+        unavailable_dates: [],
+        preferred_weekends: [],
+        notes: ""
+      });
     }
-    setEditingRequest(doctor.request);
-    setEditRequestForm({
-      unavailable_dates: Array.isArray(doctor.request.unavailable_dates) ? doctor.request.unavailable_dates.map((date: string) => parseLocalDate(date)) : [],
-      preferred_weekends: Array.isArray(doctor.request.preferred_weekends) ? doctor.request.preferred_weekends : [],
-      notes: doctor.request.notes || ""
-    });
     setShowEditRequestDialog(true);
   };
   const closeEditRequestDialog = () => {
@@ -1067,26 +1074,42 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     if (!editingRequest) return;
     setSaving(true);
     try {
-      const {
-        error
-      } = await supabase.from('doctor_requests').update({
-        unavailable_dates: editRequestForm.unavailable_dates.map(date => format(date, 'yyyy-MM-dd')),
-        preferred_weekends: editRequestForm.preferred_weekends,
-        notes: editRequestForm.notes,
-        updated_at: new Date().toISOString()
-      }).eq('id', editingRequest.id);
-      if (error) throw error;
-      toast({
-        title: "Request Updated",
-        description: "Doctor's request has been updated successfully."
-      });
+      if (editingRequest.isNew) {
+        // Creating a new request
+        const { error } = await supabase.from('doctor_requests').insert({
+          doctor_id: editingRequest.doctor_id,
+          block_id: editingRequest.block_id,
+          unavailable_dates: editRequestForm.unavailable_dates.map(date => format(date, 'yyyy-MM-dd')),
+          preferred_weekends: editRequestForm.preferred_weekends,
+          notes: editRequestForm.notes,
+          status: 'not_started'
+        });
+        if (error) throw error;
+        toast({
+          title: "Request Created",
+          description: "Doctor's request has been created successfully."
+        });
+      } else {
+        // Updating existing request
+        const { error } = await supabase.from('doctor_requests').update({
+          unavailable_dates: editRequestForm.unavailable_dates.map(date => format(date, 'yyyy-MM-dd')),
+          preferred_weekends: editRequestForm.preferred_weekends,
+          notes: editRequestForm.notes,
+          updated_at: new Date().toISOString()
+        }).eq('id', editingRequest.id);
+        if (error) throw error;
+        toast({
+          title: "Request Updated",
+          description: "Doctor's request has been updated successfully."
+        });
+      }
       closeEditRequestDialog();
       fetchData(); // Refresh data
     } catch (error) {
-      console.error('Error updating request:', error);
+      console.error('Error saving request:', error);
       toast({
-        title: "Update Failed",
-        description: "Failed to update the request. Please try again.",
+        title: "Save Failed",
+        description: "Failed to save the request. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -1336,13 +1359,19 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                                  <TableCell>{getStatusBadge(doctor.status)}</TableCell>
                                  <TableCell>{doctor.submittedAt || '-'}</TableCell>
                                  <TableCell onClick={e => e.stopPropagation()}>
-                                   {doctor.status !== 'submitted' ? (() => {
-                              const buttonState = getReminderButtonState(doctor.id);
-                              return <Button variant={buttonState.variant} size="sm" onClick={() => handleSendIndividualReminder(doctor)} disabled={!doctor.email || buttonState.disabled} className={buttonState.className}>
-                                           <Mail className="h-3 w-3 mr-1" />
-                                           {buttonState.text}
-                                         </Button>;
-                            })() : <span className="text-muted-foreground text-sm">-</span>}
+                                   <div className="flex gap-1">
+                                     <Button variant="outline" size="sm" onClick={() => openEditRequestDialog(doctor)}>
+                                       <Edit className="h-3 w-3 mr-1" />
+                                       {doctor.request ? 'Edit' : 'Create'}
+                                     </Button>
+                                     {doctor.status !== 'submitted' && (() => {
+                                       const buttonState = getReminderButtonState(doctor.id);
+                                       return <Button variant={buttonState.variant} size="sm" onClick={() => handleSendIndividualReminder(doctor)} disabled={!doctor.email || buttonState.disabled} className={buttonState.className}>
+                                                <Mail className="h-3 w-3 mr-1" />
+                                                {buttonState.text}
+                                              </Button>;
+                                     })()}
+                                   </div>
                                  </TableCell>
                               </TableRow>
                               {expandedRows.has(doctor.email) && doctor.request && <TableRow>
