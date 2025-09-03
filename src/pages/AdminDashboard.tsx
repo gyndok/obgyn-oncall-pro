@@ -77,6 +77,11 @@ const AdminDashboard = () => {
     notes: ""
   });
 
+  // ChatGPT Import state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+
   // State for tracking individual reminder sends
   const [reminderSends, setReminderSends] = useState<Record<string, {
     sentAt: number;
@@ -346,6 +351,122 @@ const AdminDashboard = () => {
       setSaving(false);
     }
   };
+  
+  // Import ChatGPT schedule
+  const importChatGPTSchedule = async () => {
+    if (!importFile || !currentBlock) return;
+    
+    setImporting(true);
+    try {
+      const text = await importFile.text();
+      let scheduleData;
+      
+      // Try to parse as JSON first, then CSV
+      try {
+        scheduleData = JSON.parse(text);
+      } catch {
+        // Parse as CSV
+        const lines = text.split('\n').filter(line => line.trim());
+        const headers = lines[0].split(',').map(h => h.trim());
+        scheduleData = lines.slice(1).map(line => {
+          const values = line.split(',').map(v => v.trim());
+          const obj: any = {};
+          headers.forEach((header, index) => {
+            obj[header] = values[index];
+          });
+          return obj;
+        });
+      }
+      
+      // Convert ChatGPT data to assignments format
+      const importedAssignments = [];
+      const doctorNameToId: Record<string, string> = {};
+      
+      // Create doctor name mapping
+      doctors.forEach(doctor => {
+        const lastName = doctor.name.split(' ').pop()?.toLowerCase();
+        if (lastName) {
+          doctorNameToId[lastName] = doctor.id;
+          doctorNameToId[doctor.name.toLowerCase()] = doctor.id;
+        }
+      });
+      
+      // Process each schedule entry
+      for (const entry of Array.isArray(scheduleData) ? scheduleData : [scheduleData]) {
+        const date = entry.date || entry.Date;
+        const doctorName = (entry.doctor || entry.Doctor || entry.name || entry.Name)?.toLowerCase();
+        
+        if (!date || !doctorName) continue;
+        
+        const doctorId = doctorNameToId[doctorName] || 
+                        Object.keys(doctorNameToId).find(key => 
+                          key.includes(doctorName) || doctorName.includes(key)
+                        );
+        
+        if (!doctorId) {
+          console.warn(`Doctor not found: ${doctorName}`);
+          continue;
+        }
+        
+        const assignmentDate = new Date(date);
+        const dayOfWeek = assignmentDate.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6; // Sun, Fri, Sat
+        
+        // Calculate week index
+        const blockStart = parseLocalDate(currentBlock.start_monday_date);
+        const weekIndex = Math.floor((assignmentDate.getTime() - blockStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+        
+        const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        
+        importedAssignments.push({
+          block_id: currentBlock.id,
+          week_index: weekIndex,
+          date: format(assignmentDate, 'yyyy-MM-dd'),
+          weekday_name: weekdays[dayOfWeek],
+          is_weekend: isWeekend,
+          doctor_id: doctorId
+        });
+      }
+      
+      if (importedAssignments.length === 0) {
+        throw new Error('No valid schedule entries found in the imported file');
+      }
+      
+      // Clear existing assignments and insert imported ones
+      const { error: deleteError } = await supabase
+        .from('assignments')
+        .delete()
+        .eq('block_id', currentBlock.id);
+      
+      if (deleteError) throw deleteError;
+      
+      const { error: insertError } = await supabase
+        .from('assignments')
+        .insert(importedAssignments);
+      
+      if (insertError) throw insertError;
+      
+      toast({
+        title: "ChatGPT Schedule Imported Successfully!",
+        description: `Imported ${importedAssignments.length} schedule assignments`
+      });
+      
+      setImportDialogOpen(false);
+      setImportFile(null);
+      fetchData();
+      
+    } catch (error: any) {
+      console.error('Error importing ChatGPT schedule:', error);
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import ChatGPT schedule. Please check the file format.",
+        variant: "destructive"
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const publishToCalendar = async () => {
     console.log('publishToCalendar function called', {
       currentBlock
@@ -1510,6 +1631,14 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       <Play className="h-4 w-4 mr-2" />
                        {saving ? "Generating..." : "Generate AI Schedule"}
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setImportDialogOpen(true)}
+                      disabled={!currentBlock}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import ChatGPT
+                    </Button>
                     <Button variant="outline" disabled={assignments.length === 0}>
                       <Download className="h-4 w-4 mr-2" />
                       Export CSV
@@ -1831,6 +1960,53 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
             </Button>
             <Button onClick={saveEditedRequest} disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ChatGPT Import Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Import ChatGPT Schedule</DialogTitle>
+            <DialogDescription>
+              Upload a CSV or JSON file containing your ChatGPT-generated schedule
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="schedule-file" className="text-base font-medium">Schedule File</Label>
+              <Input
+                id="schedule-file"
+                type="file"
+                accept=".csv,.json,.txt"
+                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                className="mt-2"
+              />
+              <p className="text-sm text-muted-foreground mt-2">
+                Supported formats: CSV, JSON. File should contain columns: date, doctor (or name)
+              </p>
+            </div>
+            {importFile && (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm font-medium">Selected file:</p>
+                <p className="text-sm text-muted-foreground">{importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setImportDialogOpen(false);
+              setImportFile(null);
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={importChatGPTSchedule} 
+              disabled={!importFile || importing}
+            >
+              {importing ? "Importing..." : "Import Schedule"}
             </Button>
           </DialogFooter>
         </DialogContent>
