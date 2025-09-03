@@ -969,7 +969,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
         body: {
           doctorName: "Dr. Test User",
           doctorEmail: "gyndok@yahoo.com",
-          blockTitle: "Test Call Block (November 3 - December 21, 2025)",
+          blockTitle: "Sample Call Block (November 3 - December 21, 2025)",
           submissionDeadline: "September 15, 2025",
           doctorPortalUrl: `${window.location.origin}/doctor`,
           isTest: true
@@ -1028,15 +1028,15 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
         format(new Date(currentBlock.deadline), 'MMMM d, yyyy') : 
         'TBD';
 
-      const response = await supabase.functions.invoke('send-reminder-email', {
-        body: {
-          doctorName: doctor.name,
-          doctorEmail: doctor.email,
-          blockTitle: `${currentBlock?.title || 'Call Block'} (${blockDates})`,
-          submissionDeadline: deadlineText,
-          doctorPortalUrl: `${window.location.origin}/doctor`
-        }
-      });
+        const response = await supabase.functions.invoke('send-reminder-email', {
+          body: {
+            doctorName: doctor.name,
+            doctorEmail: doctor.email,
+            blockTitle: `Call Block (${blockDates})`,
+            submissionDeadline: deadlineText,
+            doctorPortalUrl: `${window.location.origin}/doctor`
+          }
+        });
 
       const success = !response.error;
       
