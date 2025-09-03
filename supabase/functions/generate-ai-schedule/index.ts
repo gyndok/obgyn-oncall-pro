@@ -57,7 +57,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           {
             role: 'system',
@@ -83,29 +83,36 @@ RESPONSE FORMAT (REQUIRED):
   }
 }
 
-CRITICAL REQUIREMENTS (FOLLOW EXACTLY):
-- Generate exactly 49 assignments (7 weeks × 7 days)
+CRITICAL MATHEMATICAL CONSTRAINTS (MUST BE EXACT):
+- Exactly 49 total assignments (7 weeks × 7 days)
+- Exactly 7 weekend bundles (1 per doctor, each bundle = Fri+Sat+Sun of same week)
+- Exactly 28 weekday assignments (4 per doctor, Mon-Thu only)
 - Week_index must be 1-7 (Week 1 = Nov 3-9, Week 2 = Nov 10-16, etc.)
-- Each doctor gets exactly ONE weekend bundle (Fri+Sat+Sun of same week)
-- Each doctor gets exactly 4 weekdays (Mon-Thu only)
-- LeBlanc never gets Tuesday (constraint violation if assigned)
-- Use exact doctor names: Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson
-- Use abbreviated weekday names: Mon, Tue, Wed, Thu, Fri, Sat, Sun
-- Dates must be in YYYY-MM-DD format
-- Respond ONLY with valid JSON, no other text
 
-VALIDATION RULES:
-- Verify each doctor has exactly 1 weekend and 4 weekdays
-- Verify LeBlanc has 0 Tuesday assignments
-- Verify all 49 days are covered with no gaps or duplicates`
+DOCTOR ASSIGNMENT RULES (ENFORCE STRICTLY):
+- Each doctor gets EXACTLY 1 weekend bundle (Fri+Sat+Sun of same week)  
+- Each doctor gets EXACTLY 4 weekdays (Mon/Tue/Wed/Thu only)
+- LeBlanc gets ZERO Tuesday assignments (hard constraint)
+- Use exact names: Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson
+- Use abbreviated weekdays: Mon, Tue, Wed, Thu, Fri, Sat, Sun
+- Dates in YYYY-MM-DD format
+
+VALIDATION CHECKLIST (verify before responding):
+1. Count assignments per doctor: 1 weekend bundle + 4 weekdays = 7 total each
+2. Verify LeBlanc has 0 Tuesday assignments
+3. Verify each weekend bundle is Fri+Sat+Sun of same week
+4. Verify total adds up: 7 doctors × 7 assignments = 49 total
+5. Verify weekday distribution: 7 doctors × 4 weekdays = 28 weekdays
+6. Verify weekend distribution: 7 doctors × 3 weekend days = 21 weekend days
+
+Respond ONLY with valid JSON, no other text.`
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_tokens: 4000,
-        temperature: 0.1
+        max_completion_tokens: 4000
       }),
     });
 
