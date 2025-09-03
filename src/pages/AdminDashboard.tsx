@@ -1522,7 +1522,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-xl">
                       <Settings className="h-5 w-5 text-primary" />
-                      AI Scheduling Prompt Preview
+                      AI Scheduling Prompt
                     </CardTitle>
                     <CardDescription>This prompt is sent to DeepSeek to generate intelligent schedules</CardDescription>
                   </CardHeader>
