@@ -1524,7 +1524,6 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       <Settings className="h-5 w-5 text-primary" />
                       AI Scheduling Prompt
                     </CardTitle>
-                    <CardDescription>This prompt is sent to DeepSeek to generate intelligent schedules</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="bg-muted/50 rounded-lg p-4 max-h-96 overflow-y-auto">
