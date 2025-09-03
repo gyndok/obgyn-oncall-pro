@@ -295,44 +295,49 @@ const AdminDashboard = () => {
 
     setSaving(true);
     try {
-      console.log('🤖 Generating AI-powered schedule...');
+      console.log('🧮 Generating deterministic schedule...');
       
-      // Generate the AI prompt with all doctor preferences
-      const aiPrompt = generateAIPrompt();
+      // Import the deterministic scheduler
+      const { DeterministicScheduler } = await import('@/utils/deterministicScheduler');
       
-      // Prepare doctor data for the AI function
-      const doctorData = doctors.map(doctor => ({
-        id: doctor.id,
-        name: doctor.name
+      // Get submitted requests
+      const submittedRequests = doctorRequests.filter(req => req.status === 'submitted');
+      
+      // Prepare doctor requests for the scheduler
+      const doctorRequestsForScheduler = submittedRequests.map(request => ({
+        doctor_id: request.doctor_id,
+        unavailable_dates: request.unavailable_dates || [],
+        preferred_weekends: request.preferred_weekends || [],
+        notes: request.notes || ''
       }));
-
-      // Call the AI scheduling edge function
-      const response = await supabase.functions.invoke('generate-ai-schedule', {
-        body: {
-          prompt: aiPrompt,
-          blockStartDate: currentBlock.start_monday_date,
-          doctors: doctorData
-        }
-      });
-
-      if (response.error) {
-        console.error('AI scheduling error:', response.error);
-        throw new Error(response.error.message || 'Failed to generate AI schedule');
-      }
-
-      const { assignments: aiAssignments, summary } = response.data;
       
-      if (!aiAssignments || aiAssignments.length === 0) {
-        throw new Error('AI returned no assignments');
+      // Create scheduler instance
+      const scheduler = new DeterministicScheduler(
+        doctors,
+        doctorRequestsForScheduler,
+        currentBlock.start_monday_date
+      );
+      
+      // Generate schedule
+      const result = scheduler.generateSchedule();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to generate schedule');
       }
 
-      console.log(`📋 AI generated ${aiAssignments.length} assignments`);
+      const { assignments: schedulerAssignments, summary } = result;
+      
+      if (!schedulerAssignments || schedulerAssignments.length === 0) {
+        throw new Error('Scheduler returned no assignments');
+      }
+
+      console.log(`📋 Generated ${schedulerAssignments.length} assignments`);
       if (summary) {
         console.log('📊 Schedule summary:', summary);
       }
 
       // Add block_id to each assignment
-      const assignmentsWithBlockId = aiAssignments.map((assignment: any) => ({
+      const assignmentsWithBlockId = schedulerAssignments.map((assignment: any) => ({
         ...assignment,
         block_id: currentBlock.id
       }));
@@ -345,7 +350,7 @@ const AdminDashboard = () => {
 
       if (deleteError) throw deleteError;
 
-      // Insert new AI-generated assignments
+      // Insert new deterministic assignments
       const { error: insertError } = await supabase
         .from('assignments')
         .insert(assignmentsWithBlockId);
@@ -353,15 +358,15 @@ const AdminDashboard = () => {
       if (insertError) throw insertError;
 
       toast({
-        title: "AI Schedule Generated Successfully! 🤖",
-        description: `Created ${aiAssignments.length} assignments using ChatGPT with doctor preferences`,
+        title: "Deterministic Schedule Generated Successfully! 🧮",
+        description: `Created ${schedulerAssignments.length} assignments with all constraints satisfied`,
       });
 
       fetchData();
     } catch (error: any) {
-      console.error('Error generating AI schedule:', error);
+      console.error('Error generating deterministic schedule:', error);
       toast({
-        title: "AI Schedule Generation Failed",
+        title: "Schedule Generation Failed",
         description: error.message || "Failed to generate schedule. Check console for details.",
         variant: "destructive"
       });
@@ -1678,7 +1683,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-2xl font-bold">AI Schedule Generation</h2>
-                    <p className="text-muted-foreground">Generate intelligent call schedules using ChatGPT with doctor preferences</p>
+                    <p className="text-muted-foreground">Generate reliable call schedules using constraint satisfaction with doctor preferences</p>
                   </div>
                   <div className="flex gap-2">
                     <Button 
@@ -1687,7 +1692,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       className="bg-gradient-primary hover:opacity-90"
                     >
                       <Play className="h-4 w-4 mr-2" />
-                       {saving ? "Generating..." : "Generate AI Schedule"}
+                       {saving ? "Generating..." : "Generate Schedule"}
                     </Button>
                     <Button variant="outline" disabled={assignments.length === 0}>
                       <Download className="h-4 w-4 mr-2" />
@@ -1696,31 +1701,50 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                   </div>
                 </div>
 
-                {/* AI Prompt Preview */}
+                {/* Scheduling Algorithm Overview */}
                 <Card className="card-stats">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-xl">
                       <Settings className="h-5 w-5 text-primary" />
-                      AI Scheduling Prompt Preview
+                      Scheduling Algorithm Overview
                     </CardTitle>
                     <CardDescription>
-                      This prompt is sent to ChatGPT to generate intelligent schedules
+                      Deterministic constraint satisfaction ensures all rules are perfectly met
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="bg-muted/50 rounded-lg p-4 max-h-96 overflow-y-auto">
-                      <pre className="text-sm whitespace-pre-wrap font-mono text-muted-foreground">
-                        {generateAIPrompt()}
-                      </pre>
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <div className="space-y-3 text-sm">
+                        <div className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span>Each doctor gets exactly 1 weekend (Fri+Sat+Sun) and 4 weekdays</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span>No adjacency violations (no Thu before or Mon after weekend)</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span>LeBlanc never assigned to Tuesday</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span>All unavailable dates respected</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span>Preferred weekends honored when possible</span>
+                        </div>
+                      </div>
                     </div>
                     <div className="mt-4 p-3 bg-accent/10 border border-accent/20 rounded-lg">
                         <div className="flex items-start gap-3">
                           <div className="h-2 w-2 rounded-full bg-green-500 mt-2 flex-shrink-0"></div>
                           <div className="text-sm">
-                            <p className="font-medium text-green-700 mb-1">AI-Powered Scheduling Active</p>
-                            <p className="text-muted-foreground">
-                              This prompt is sent to ChatGPT when you click "Generate AI Schedule" to create optimal assignments based on doctor preferences.
-                            </p>
+                             <p className="font-medium text-green-700 mb-1">Deterministic Scheduling Active</p>
+                             <p className="text-muted-foreground">
+                               This uses constraint satisfaction algorithms to guarantee all scheduling rules are perfectly satisfied based on doctor preferences.
+                             </p>
                           </div>
                          </div>
                      </div>
@@ -1737,12 +1761,12 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     <CardContent className="py-16 text-center">
                        <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                        <h3 className="text-xl font-semibold mb-2">No Schedule Generated</h3>
-                        <p className="text-muted-foreground mb-4">
-                          Generate an AI-powered schedule using ChatGPT to assign doctors optimally
-                        </p>
-                       <Button onClick={generateSchedule} disabled={saving}>
-                         {saving ? "Generating..." : "Generate AI Schedule"}
-                       </Button>
+                         <p className="text-muted-foreground mb-4">
+                           Generate a reliable schedule using deterministic algorithms to guarantee all constraints are satisfied
+                         </p>
+                        <Button onClick={generateSchedule} disabled={saving}>
+                          {saving ? "Generating..." : "Generate Schedule"}
+                        </Button>
                      </CardContent>
                    </Card>
                  )}
