@@ -949,6 +949,59 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     }
   };
 
+  const handleSendIndividualReminder = async (doctor: any) => {
+    if (doctor.status === 'submitted') {
+      toast({
+        title: "Already Submitted",
+        description: `${doctor.name} has already submitted their preferences.`,
+      });
+      return;
+    }
+
+    try {
+      console.log(`📧 Sending individual reminder email to ${doctor.name} (${doctor.email})`);
+      
+      const blockDates = currentBlock ? 
+        `${format(parseLocalDate(currentBlock.start_monday_date), 'MMMM d')} - ${format(parseLocalDate(currentBlock.end_sunday_date), 'MMMM d, yyyy')}` : 
+        'Call Block';
+      const deadlineText = currentBlock?.deadline ? 
+        format(new Date(currentBlock.deadline), 'MMMM d, yyyy') : 
+        'TBD';
+
+      const response = await supabase.functions.invoke('send-reminder-email', {
+        body: {
+          doctorName: doctor.name,
+          doctorEmail: doctor.email,
+          blockTitle: `${currentBlock?.title || 'Call Block'} (${blockDates})`,
+          submissionDeadline: deadlineText,
+          doctorPortalUrl: `${window.location.origin}/doctor`
+        }
+      });
+
+      if (response.error) {
+        console.error(`Failed to send email to ${doctor.name}:`, response.error);
+        toast({
+          title: "Failed to Send Reminder",
+          description: "Please check the logs for details.",
+          variant: "destructive"
+        });
+      } else {
+        console.log(`✅ Email sent successfully to ${doctor.name}`);
+        toast({
+          title: "Reminder Sent",
+          description: `Email reminder sent to ${doctor.name}`,
+        });
+      }
+    } catch (error) {
+      console.error(`Error sending email to ${doctor.name}:`, error);
+      toast({
+        title: "Error",
+        description: "Failed to send reminder email",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Edit request functions
   const openEditRequestDialog = (doctor: any) => {
     if (!doctor.request) {
@@ -1291,16 +1344,17 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                   </CardHeader>
                   <CardContent>
                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-12"></TableHead>
-                            <TableHead className="w-20">Never Submitted</TableHead>
-                            <TableHead>Doctor</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Submitted At</TableHead>
-                          </TableRow>
-                        </TableHeader>
+                         <TableHeader>
+                           <TableRow>
+                             <TableHead className="w-12"></TableHead>
+                             <TableHead className="w-20">Never Submitted</TableHead>
+                             <TableHead>Doctor</TableHead>
+                             <TableHead>Email</TableHead>
+                             <TableHead>Status</TableHead>
+                             <TableHead>Submitted At</TableHead>
+                             <TableHead className="w-24">Actions</TableHead>
+                           </TableRow>
+                         </TableHeader>
                         <TableBody>
                           {doctorStatuses.map((doctor) => (
                             <React.Fragment key={doctor.email}>
@@ -1324,14 +1378,29 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                                     <span className="text-muted-foreground text-sm">-</span>
                                   )}
                                 </TableCell>
-                                <TableCell className="font-medium">{doctor.name}</TableCell>
-                                <TableCell>{doctor.email}</TableCell>
-                                <TableCell>{getStatusBadge(doctor.status)}</TableCell>
-                                <TableCell>{doctor.submittedAt || '-'}</TableCell>
+                                 <TableCell className="font-medium">{doctor.name}</TableCell>
+                                 <TableCell>{doctor.email}</TableCell>
+                                 <TableCell>{getStatusBadge(doctor.status)}</TableCell>
+                                 <TableCell>{doctor.submittedAt || '-'}</TableCell>
+                                 <TableCell onClick={(e) => e.stopPropagation()}>
+                                   {doctor.status !== 'submitted' ? (
+                                     <Button 
+                                       variant="outline" 
+                                       size="sm"
+                                       onClick={() => handleSendIndividualReminder(doctor)}
+                                       disabled={!doctor.email}
+                                     >
+                                       <Mail className="h-3 w-3 mr-1" />
+                                       Send Reminder
+                                     </Button>
+                                   ) : (
+                                     <span className="text-muted-foreground text-sm">-</span>
+                                   )}
+                                 </TableCell>
                               </TableRow>
                               {expandedRows.has(doctor.email) && doctor.request && (
                                  <TableRow>
-                                   <TableCell colSpan={6} className="bg-muted/30 p-6">{/* Updated colSpan from 5 to 6 */}
+                                   <TableCell colSpan={7} className="bg-muted/30 p-6">{/* Updated colSpan from 6 to 7 */}
                                     <div className="space-y-4">
                                       <div className="flex items-center justify-between">
                                         <h4 className="font-semibold text-sm">Request Details</h4>
