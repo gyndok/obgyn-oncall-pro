@@ -114,6 +114,12 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
     return ['friday', 'saturday', 'sunday'].includes(day);
   };
 
+  const getDoctorLastName = (fullName: string) => {
+    const name = fullName.replace('Dr. ', '');
+    const nameParts = name.split(' ');
+    return nameParts[nameParts.length - 1]; // Return the last part (last name)
+  };
+
   const getDoctorColor = (doctorName: string) => {
     const name = doctorName.replace('Dr. ', '');
     const colors = {
@@ -178,7 +184,7 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
                                    ['fri', 'sat', 'sun'].includes(day) ? 'ring-2 ring-accent/30' : ''
                                  }`}
                                >
-                                 {(doctor as string).replace('Dr. ', '')}
+                                 {getDoctorLastName(doctor as string)}
                                </Badge>
                              </div>
                            ) : (
