@@ -84,8 +84,9 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
         const weekEndDate = addDays(weekStartDate, 6);
         doctor.weekend = `Week ${assignment.week_index} (${format(addDays(weekStartDate, 4), 'MMM d')}-${format(weekEndDate, 'd')})`;
       } else if (!assignment.is_weekend) {
-        // Weekday assignment
-        doctor.weekdays.push(`Week ${assignment.week_index} ${assignment.weekday_name}`);
+        // Weekday assignment - show day and date like "Mon 11/3"
+        const assignmentDate = new Date(assignment.date);
+        doctor.weekdays.push(`${assignment.weekday_name} ${format(assignmentDate, 'M/d')}`);
       }
     });
     
