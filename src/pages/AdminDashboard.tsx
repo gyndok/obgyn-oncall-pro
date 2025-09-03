@@ -1531,15 +1531,6 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                         {generateAIPrompt()}
                       </pre>
                     </div>
-                    <div className="mt-4 p-3 bg-accent/10 border border-accent/20 rounded-lg">
-                        <div className="flex items-start gap-3">
-                          <div className="h-2 w-2 rounded-full bg-green-500 mt-2 flex-shrink-0"></div>
-                          <div className="text-sm">
-                            <p className="font-medium text-green-700 mb-1">AI-Powered Scheduling Active</p>
-                            <p className="text-muted-foreground">This prompt is sent to DeepSeek when you click "Generate AI Schedule" to create optimal assignments based on doctor preferences.</p>
-                          </div>
-                         </div>
-                     </div>
                   </CardContent>
                 </Card>
 
