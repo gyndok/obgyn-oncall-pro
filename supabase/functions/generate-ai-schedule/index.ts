@@ -57,13 +57,36 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'o3-2025-04-16',
         messages: [
           {
             role: 'system',
-            content: `You are an expert medical scheduling AI. You must respond with a valid JSON object containing a complete 7-week call schedule.
+            content: `You are an expert medical scheduling AI that must solve a complex constraint satisfaction problem.
 
-RESPONSE FORMAT (REQUIRED):
+TASK: Create a 7-week call schedule for 7 doctors with strict mathematical constraints.
+
+MATHEMATICAL REQUIREMENTS (MUST BE EXACT):
+- Total assignments: 49 (7 weeks × 7 days)
+- Total doctors: 7 (Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson)
+- Assignments per doctor: 7 (1 weekend bundle + 4 weekdays)
+- Weekend assignments: 21 (7 doctors × 3 days each = Fri+Sat+Sun)
+- Weekday assignments: 28 (7 doctors × 4 days each = Mon+Tue+Wed+Thu)
+
+HARD CONSTRAINTS (CANNOT BE VIOLATED):
+1. Each doctor gets EXACTLY 1 weekend bundle (Fri+Sat+Sun of same week)
+2. Each doctor gets EXACTLY 4 weekdays (Mon/Tue/Wed/Thu only)
+3. LeBlanc gets ZERO Tuesday assignments
+4. Week_index: 1-7 (Week 1 = Nov 3-9, Week 2 = Nov 10-16, etc.)
+5. Weekday names: Mon, Tue, Wed, Thu, Fri, Sat, Sun
+6. Dates: YYYY-MM-DD format starting 2025-11-03
+
+REASONING APPROACH:
+1. First assign weekend bundles (7 weeks, 7 doctors, 1 weekend each)
+2. Then distribute weekdays ensuring each doctor gets exactly 4
+3. Verify LeBlanc gets no Tuesday assignments
+4. Check math: 7×7=49 total, 7×3=21 weekends, 7×4=28 weekdays
+
+RESPONSE FORMAT:
 {
   "schedule": [
     {
@@ -72,8 +95,7 @@ RESPONSE FORMAT (REQUIRED):
       "is_weekend": false,
       "weekday_name": "Mon",
       "week_index": 1
-    },
-    ...
+    }
   ],
   "summary": {
     "total_assignments": 49,
@@ -81,31 +103,7 @@ RESPONSE FORMAT (REQUIRED):
     "weekday_assignments": 28,
     "violations": []
   }
-}
-
-CRITICAL MATHEMATICAL CONSTRAINTS (MUST BE EXACT):
-- Exactly 49 total assignments (7 weeks × 7 days)
-- Exactly 7 weekend bundles (1 per doctor, each bundle = Fri+Sat+Sun of same week)
-- Exactly 28 weekday assignments (4 per doctor, Mon-Thu only)
-- Week_index must be 1-7 (Week 1 = Nov 3-9, Week 2 = Nov 10-16, etc.)
-
-DOCTOR ASSIGNMENT RULES (ENFORCE STRICTLY):
-- Each doctor gets EXACTLY 1 weekend bundle (Fri+Sat+Sun of same week)  
-- Each doctor gets EXACTLY 4 weekdays (Mon/Tue/Wed/Thu only)
-- LeBlanc gets ZERO Tuesday assignments (hard constraint)
-- Use exact names: Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson
-- Use abbreviated weekdays: Mon, Tue, Wed, Thu, Fri, Sat, Sun
-- Dates in YYYY-MM-DD format
-
-VALIDATION CHECKLIST (verify before responding):
-1. Count assignments per doctor: 1 weekend bundle + 4 weekdays = 7 total each
-2. Verify LeBlanc has 0 Tuesday assignments
-3. Verify each weekend bundle is Fri+Sat+Sun of same week
-4. Verify total adds up: 7 doctors × 7 assignments = 49 total
-5. Verify weekday distribution: 7 doctors × 4 weekdays = 28 weekdays
-6. Verify weekend distribution: 7 doctors × 3 weekend days = 21 weekend days
-
-Respond ONLY with valid JSON, no other text.`
+}`
           },
           {
             role: 'user',
