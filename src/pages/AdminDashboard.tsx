@@ -77,6 +77,10 @@ const AdminDashboard = () => {
     notes: ""
   });
 
+  // Import schedule states
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importText, setImportText] = useState("");
+
   // State for tracking individual reminder sends
   const [reminderSends, setReminderSends] = useState<Record<string, {
     sentAt: number;
@@ -340,6 +344,118 @@ const AdminDashboard = () => {
       toast({
         title: "AI Schedule Generation Failed",
         description: error.message || "Failed to generate schedule. Check console for details.",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const importScheduleFromText = async () => {
+    if (!currentBlock || !importText.trim()) return;
+    
+    setSaving(true);
+    try {
+      console.log('📋 Importing schedule from text...');
+      
+      // Parse the JSON response from ChatGPT
+      let scheduleData;
+      try {
+        // Try to extract JSON from the text (ChatGPT often wraps it in markdown)
+        const jsonMatch = importText.match(/```json\n?([\s\S]*?)\n?```/) || 
+                         importText.match(/```\n?([\s\S]*?)\n?```/) ||
+                         [null, importText];
+        
+        const cleanJson = jsonMatch[1] || importText.trim();
+        scheduleData = JSON.parse(cleanJson);
+      } catch (parseError) {
+        console.error('Failed to parse imported text as JSON:', parseError);
+        toast({
+          title: "Import Failed",
+          description: "Invalid JSON format. Please paste a valid schedule response from ChatGPT.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Validate the structure
+      if (!scheduleData.schedule || !Array.isArray(scheduleData.schedule)) {
+        toast({
+          title: "Import Failed", 
+          description: "Invalid schedule format. Expected 'schedule' array in the response.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Convert the schedule data to assignments
+      const importedAssignments = scheduleData.schedule.map((item: any) => {
+        // Find the doctor by name
+        const doctor = doctors.find(d => 
+          d.name.toLowerCase().includes(item.doctor?.toLowerCase()) ||
+          item.doctor?.toLowerCase().includes(d.name.toLowerCase())
+        );
+
+        if (!doctor) {
+          console.warn(`Doctor not found for: ${item.doctor}`);
+          return null;
+        }
+
+        const date = new Date(item.date);
+        const dayName = format(date, 'EEEE');
+        const isWeekend = dayName === 'Saturday' || dayName === 'Sunday';
+
+        return {
+          block_id: currentBlock.id,
+          week_index: item.week || 1,
+          date: format(date, 'yyyy-MM-dd'),
+          is_weekend: isWeekend,
+          weekday_name: dayName,
+          doctor_id: doctor.id
+        };
+      }).filter(Boolean);
+
+      console.log(`📋 Processed ${importedAssignments.length} assignments from import`);
+
+      // Clear existing assignments for this block
+      const { error: deleteError } = await supabase
+        .from('assignments')
+        .delete()
+        .eq('block_id', currentBlock.id);
+
+      if (deleteError) throw deleteError;
+
+      // Insert the imported assignments
+      const { error: insertError } = await supabase
+        .from('assignments')
+        .insert(importedAssignments);
+
+      if (insertError) throw insertError;
+
+      // Refetch assignments for current block
+      if (currentBlock) {
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('assignments')
+          .select(`*, doctors (name, email)`)
+          .eq('block_id', currentBlock.id);
+
+        if (assignmentsError) throw assignmentsError;
+        setAssignments(assignmentsData || []);
+      }
+
+      toast({
+        title: "Schedule Imported Successfully! 📋",
+        description: `Imported ${importedAssignments.length} assignments from ChatGPT response`
+      });
+
+      setShowImportDialog(false);
+      setImportText("");
+
+    } catch (error: any) {
+      console.error('Error importing schedule:', error);
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import schedule. Check console for details.",
         variant: "destructive"
       });
     } finally {
@@ -1506,6 +1622,10 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       <Play className="h-4 w-4 mr-2" />
                        {saving ? "Generating..." : "Generate AI Schedule"}
                     </Button>
+                    <Button onClick={() => setShowImportDialog(true)} variant="outline" disabled={saving}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import from ChatGPT
+                    </Button>
                     <Button variant="outline" disabled={assignments.length === 0}>
                       <Download className="h-4 w-4 mr-2" />
                       Export CSV
@@ -1837,6 +1957,53 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
             </Button>
             <Button onClick={saveEditedRequest} disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Schedule Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Schedule from ChatGPT</DialogTitle>
+            <DialogDescription>
+              Paste the JSON response from ChatGPT here to import the schedule directly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="import-text">ChatGPT Response (JSON)</Label>
+              <Textarea
+                id="import-text"
+                placeholder="Paste the JSON response from ChatGPT here..."
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                className="min-h-[200px] font-mono text-sm"
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <p className="mb-2">Expected format:</p>
+              <pre className="bg-muted/50 p-2 rounded text-xs overflow-x-auto">
+{`{
+  "schedule": [
+    {
+      "week": 1,
+      "date": "2024-01-01", 
+      "doctor": "Dr. Smith"
+    },
+    ...
+  ]
+}`}
+              </pre>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={importScheduleFromText} disabled={!importText.trim() || saving}>
+              {saving ? "Importing..." : "Import Schedule"}
             </Button>
           </DialogFooter>
         </DialogContent>
