@@ -91,6 +91,57 @@ const AdminDashboard = () => {
     notes: ""
   });
 
+  // State for tracking individual reminder sends
+  const [reminderSends, setReminderSends] = useState<Record<string, { sentAt: number; success: boolean }>>({});
+
+  // Load reminder sends from localStorage on mount
+  useEffect(() => {
+    const savedReminderSends = localStorage.getItem('adminReminderSends');
+    if (savedReminderSends) {
+      try {
+        setReminderSends(JSON.parse(savedReminderSends));
+      } catch (error) {
+        console.error('Error loading reminder sends from localStorage:', error);
+      }
+    }
+  }, []);
+
+  // Save reminder sends to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('adminReminderSends', JSON.stringify(reminderSends));
+  }, [reminderSends]);
+
+  // Check if a doctor can receive a reminder (24 hour cooldown)
+  const canSendReminder = (doctorId: string) => {
+    const lastSend = reminderSends[doctorId];
+    if (!lastSend) return true;
+    
+    const now = Date.now();
+    const hoursSinceLastSend = (now - lastSend.sentAt) / (1000 * 60 * 60);
+    return hoursSinceLastSend >= 24;
+  };
+
+  // Get button state for reminder button
+  const getReminderButtonState = (doctorId: string) => {
+    const lastSend = reminderSends[doctorId];
+    if (!lastSend) return { variant: 'outline' as const, text: 'Send Reminder', disabled: false };
+    
+    const now = Date.now();
+    const hoursSinceLastSend = (now - lastSend.sentAt) / (1000 * 60 * 60);
+    
+    if (hoursSinceLastSend < 24) {
+      const hoursLeft = Math.ceil(24 - hoursSinceLastSend);
+      return { 
+        variant: lastSend.success ? 'default' as const : 'destructive' as const, 
+        text: `Sent (${hoursLeft}h)`, 
+        disabled: true,
+        className: lastSend.success ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' : ''
+      };
+    }
+    
+    return { variant: 'outline' as const, text: 'Send Reminder', disabled: false };
+  };
+
   // Publishing state
   const [publishing, setPublishing] = useState(false);
   const [publishStatus, setPublishStatus] = useState<{type: 'success' | 'error', message: string} | null>(null);
@@ -958,6 +1009,15 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
       return;
     }
 
+    if (!canSendReminder(doctor.id)) {
+      toast({
+        title: "Recently Sent",
+        description: `Reminder already sent to ${doctor.name}. Please wait 24 hours before sending another.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       console.log(`📧 Sending individual reminder email to ${doctor.name} (${doctor.email})`);
       
@@ -978,6 +1038,17 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
         }
       });
 
+      const success = !response.error;
+      
+      // Update reminder tracking state
+      setReminderSends(prev => ({
+        ...prev,
+        [doctor.id]: {
+          sentAt: Date.now(),
+          success
+        }
+      }));
+
       if (response.error) {
         console.error(`Failed to send email to ${doctor.name}:`, response.error);
         toast({
@@ -994,6 +1065,16 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
       }
     } catch (error) {
       console.error(`Error sending email to ${doctor.name}:`, error);
+      
+      // Track failed attempt
+      setReminderSends(prev => ({
+        ...prev,
+        [doctor.id]: {
+          sentAt: Date.now(),
+          success: false
+        }
+      }));
+      
       toast({
         title: "Error",
         description: "Failed to send reminder email",
@@ -1384,15 +1465,21 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                                  <TableCell>{doctor.submittedAt || '-'}</TableCell>
                                  <TableCell onClick={(e) => e.stopPropagation()}>
                                    {doctor.status !== 'submitted' ? (
-                                     <Button 
-                                       variant="outline" 
-                                       size="sm"
-                                       onClick={() => handleSendIndividualReminder(doctor)}
-                                       disabled={!doctor.email}
-                                     >
-                                       <Mail className="h-3 w-3 mr-1" />
-                                       Send Reminder
-                                     </Button>
+                                     (() => {
+                                       const buttonState = getReminderButtonState(doctor.id);
+                                       return (
+                                         <Button 
+                                           variant={buttonState.variant} 
+                                           size="sm"
+                                           onClick={() => handleSendIndividualReminder(doctor)}
+                                           disabled={!doctor.email || buttonState.disabled}
+                                           className={buttonState.className}
+                                         >
+                                           <Mail className="h-3 w-3 mr-1" />
+                                           {buttonState.text}
+                                         </Button>
+                                       );
+                                     })()
                                    ) : (
                                      <span className="text-muted-foreground text-sm">-</span>
                                    )}
