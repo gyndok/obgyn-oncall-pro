@@ -910,6 +910,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
   };
 
   const handleSendTestEmail = async () => {
+    // Send test email to verify the reminder format
     try {
       console.log('📧 Sending test email to gyndok@yahoo.com');
       
