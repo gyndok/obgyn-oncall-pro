@@ -11,7 +11,7 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 // Calendar IDs
-const ON_CALL_CALENDAR_ID = 'di4a2cdcs23acuqmb5rvbmba2k@group.calendar.google.com';
+const ON_CALL_CALENDAR_ID = 'q6u72r1ummu006qishq90i7iek@group.calendar.google.com';
 const STAFFING_CALENDAR_ID = 'odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com';
 
 serve(async (req) => {
