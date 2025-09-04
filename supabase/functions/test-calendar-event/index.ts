@@ -35,15 +35,13 @@ serve(async (req) => {
     // Staffing calendar ID
     const staffingCalendarId = 'odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com';
 
-    // Create a test event for tomorrow at 2 PM
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Create a test event for tomorrow at 2 PM (Central Time)
+    const today = new Date();
+    const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
     
-    const startTime = new Date(tomorrow);
-    startTime.setHours(14, 0, 0, 0); // 2:00 PM
-    
-    const endTime = new Date(tomorrow);
-    endTime.setHours(15, 0, 0, 0); // 3:00 PM
+    // Create times in Central timezone
+    const startTime = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 14, 0, 0); // 2:00 PM
+    const endTime = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 15, 0, 0); // 3:00 PM
 
     const testEvent = {
       summary: 'Test Event - OB/GYN Staffing',
