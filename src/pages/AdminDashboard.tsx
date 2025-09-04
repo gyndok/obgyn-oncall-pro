@@ -177,6 +177,9 @@ const AdminDashboard = () => {
   
   // Cleanup state
   const [cleaningUp, setCleaningUp] = useState(false);
+  
+  // Test publishing individual doctors
+  const [testPublishingDoctors, setTestPublishingDoctors] = useState<Set<string>>(new Set());
   useEffect(() => {
     fetchData();
   }, []);
@@ -544,6 +547,56 @@ const AdminDashboard = () => {
       });
     } finally {
       setImporting(false);
+    }
+  };
+
+  const testPublishDoctor = async (doctorId: string, doctorName: string) => {
+    if (!currentBlock || !user) return;
+
+    setTestPublishingDoctors(prev => new Set(prev).add(doctorId));
+    
+    try {
+      // Get assignments for just this doctor
+      const doctorAssignments = assignments.filter(a => a.doctor_id === doctorId);
+      
+      if (doctorAssignments.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `No assignments found for ${doctorName}`
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('publish-to-calendar', {
+        body: {
+          blockId: currentBlock.id,
+          calendarId: 'on-call', // or 'staffing' if needed
+          userId: user.id,
+          testDoctorId: doctorId // Add this to filter in the edge function
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Test published ${doctorAssignments.length} assignments for ${doctorName} to calendar!`
+      });
+
+    } catch (error: any) {
+      console.error('Error publishing doctor to calendar:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to publish doctor to calendar"
+      });
+    } finally {
+      setTestPublishingDoctors(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(doctorId);
+        return newSet;
+      });
     }
   };
 
@@ -1933,7 +1986,15 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                   </CardContent>
                 </Card>
 
-                {assignments.length > 0 ? <ScheduleVisualization assignments={assignments} block={currentBlock} /> : <Card className="shadow-soft">
+                {assignments.length > 0 ? (
+                  <ScheduleVisualization 
+                    assignments={assignments} 
+                    block={currentBlock} 
+                    onTestPublishDoctor={testPublishDoctor}
+                    testPublishingDoctors={testPublishingDoctors}
+                  />
+                ) : (
+                  <Card className="shadow-soft">
                     <CardContent className="py-16 text-center">
                        <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                        <h3 className="text-xl font-semibold mb-2">No Schedule Generated</h3>
@@ -1944,16 +2005,19 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                          {saving ? "Generating..." : "Generate AI Schedule"}
                        </Button>
                      </CardContent>
-                   </Card>}
-               </> : <Card className="shadow-soft">
-                 <CardContent className="py-16 text-center">
-                   <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-xl font-semibold mb-2">No Active Call Block</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Create a call block first to generate schedules
-                  </p>
-                </CardContent>
-              </Card>}
+                   </Card>
+                )}
+              </> : (
+                <Card className="shadow-soft">
+                  <CardContent className="py-16 text-center">
+                    <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                   <h3 className="text-xl font-semibold mb-2">No Active Call Block</h3>
+                   <p className="text-muted-foreground mb-4">
+                     Create a call block first to generate schedules
+                   </p>
+                 </CardContent>
+               </Card>
+              )}
           </TabsContent>
 
           {/* Doctors Tab */}
