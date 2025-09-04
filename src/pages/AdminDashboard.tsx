@@ -537,7 +537,7 @@ const AdminDashboard = () => {
       } = await supabase.functions.invoke('publish-to-calendar', {
         body: {
           blockId: currentBlock.id,
-          calendarId: 'primary' // Can be made configurable later
+          calendarId: 'di4a2cdcs23acuqmb5rvbmba2k@group.calendar.google.com'
         }
       });
       console.log('Supabase function response:', {
