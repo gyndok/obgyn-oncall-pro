@@ -64,29 +64,35 @@ export type Database = {
       }
       blocks: {
         Row: {
+          calendar_events: Json | null
           created_at: string
           created_by: string | null
           deadline: string | null
           end_sunday_date: string
           id: string
+          published_at: string | null
           start_monday_date: string
           status: string
         }
         Insert: {
+          calendar_events?: Json | null
           created_at?: string
           created_by?: string | null
           deadline?: string | null
           end_sunday_date: string
           id?: string
+          published_at?: string | null
           start_monday_date: string
           status?: string
         }
         Update: {
+          calendar_events?: Json | null
           created_at?: string
           created_by?: string | null
           deadline?: string | null
           end_sunday_date?: string
           id?: string
+          published_at?: string | null
           start_monday_date?: string
           status?: string
         }
