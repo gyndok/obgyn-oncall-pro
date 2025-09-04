@@ -174,6 +174,9 @@ const AdminDashboard = () => {
 
   // Never submitted tracking state
   const [neverSubmittedDoctors, setNeverSubmittedDoctors] = useState<Set<string>>(new Set());
+  
+  // Cleanup state
+  const [cleaningUp, setCleaningUp] = useState(false);
   useEffect(() => {
     fetchData();
   }, []);
@@ -259,9 +262,13 @@ const AdminDashboard = () => {
         status: 'collecting'
       });
       if (error) throw error;
+      
+      // Clean up old doctor requests from previous blocks to avoid confusion
+      await cleanupOldData();
+      
       toast({
         title: "Success",
-        description: "New call block created successfully"
+        description: "New call block created successfully! Old doctor requests have been archived."
       });
       setShowCreateDialog(false);
       setNewBlockStartDate("");
@@ -596,6 +603,45 @@ const AdminDashboard = () => {
       });
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const cleanupOldData = async () => {
+    try {
+      // Delete doctor requests from blocks that are not the current active block
+      // Keep published blocks' data but remove collecting/closed blocks that are old
+      const { error } = await supabase
+        .from('doctor_requests')
+        .delete()
+        .not('block_id', 'eq', currentBlock?.id || '')
+        .in('status', ['not_started', 'in_progress']);
+      
+      if (error) throw error;
+      
+      console.log('Cleaned up old doctor requests');
+    } catch (error) {
+      console.error('Error cleaning up old data:', error);
+    }
+  };
+
+  const manualCleanup = async () => {
+    setCleaningUp(true);
+    try {
+      await cleanupOldData();
+      await fetchData(); // Refresh the data
+      toast({
+        title: "Success",
+        description: "Old doctor requests have been cleaned up. Doctors will start fresh for the current block."
+      });
+    } catch (error: any) {
+      console.error('Error during cleanup:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to cleanup old data"
+      });
+    } finally {
+      setCleaningUp(false);
     }
   };
 
@@ -1536,7 +1582,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                   Cancel
                 </Button>
                 <Button onClick={createNewBlock} disabled={saving}>
-                  {saving ? "Creating..." : "Create Block"}
+                  {saving ? "Creating..." : "Create Block & Clean Old Data"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -2091,6 +2137,10 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                   <div className="flex gap-4 flex-wrap">
                     <Button onClick={testCalendar} disabled={testingCalendar} variant="outline" size="sm">
                       {testingCalendar ? "Testing..." : "Test Calendar"}
+                    </Button>
+                    
+                    <Button onClick={manualCleanup} disabled={cleaningUp} variant="outline" size="sm" className="text-orange-600 border-orange-600 hover:bg-orange-50">
+                      {cleaningUp ? "Cleaning..." : "Clean Old Data"}
                     </Button>
                     
                     <Button onClick={publishToCalendar} disabled={!currentBlock || assignments.length === 0 || publishing} className="bg-gradient-primary hover:opacity-90">
