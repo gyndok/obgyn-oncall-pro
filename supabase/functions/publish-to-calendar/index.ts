@@ -253,6 +253,68 @@ serve(async (req) => {
 
     const allEvents = [...callEvents, ...offEvents];
 
+    // Check for and delete existing events to prevent duplicates
+    const deletedEvents = [];
+    const blockStartDate = block.start_monday_date;
+    const blockEndDate = block.end_sunday_date;
+    
+    console.log(`Checking for existing events between ${blockStartDate} and ${blockEndDate}`);
+
+    // Function to delete existing events in a calendar
+    const deleteExistingEvents = async (calendarId: string, calendarName: string) => {
+      try {
+        // List existing events in the date range
+        const listUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
+          `timeMin=${blockStartDate}T00:00:00Z&timeMax=${new Date(blockEndDate + 'T23:59:59Z').toISOString()}&singleEvents=true`;
+        
+        const listResponse = await fetch(listUrl, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (listResponse.ok) {
+          const existingEvents = await listResponse.json();
+          console.log(`Found ${existingEvents.items?.length || 0} existing events in ${calendarName} calendar`);
+          
+          // Delete each existing event
+          for (const existingEvent of existingEvents.items || []) {
+            try {
+              const deleteResponse = await fetch(
+                `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${existingEvent.id}`,
+                {
+                  method: 'DELETE',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                  },
+                }
+              );
+              
+              if (deleteResponse.ok) {
+                deletedEvents.push({ ...existingEvent, calendar: calendarName });
+                console.log(`Deleted existing event: ${existingEvent.summary}`);
+              } else {
+                console.error(`Failed to delete event ${existingEvent.id}: ${await deleteResponse.text()}`);
+              }
+            } catch (error) {
+              console.error(`Error deleting event ${existingEvent.id}: ${error}`);
+            }
+          }
+        } else {
+          console.error(`Failed to list events in ${calendarName}: ${await listResponse.text()}`);
+        }
+      } catch (error) {
+        console.error(`Error checking existing events in ${calendarName}: ${error}`);
+      }
+    };
+
+    // Delete existing events from both calendars
+    await deleteExistingEvents(ON_CALL_CALENDAR_ID, 'on-call');
+    await deleteExistingEvents(STAFFING_CALENDAR_ID, 'staffing');
+
+    console.log(`Deleted ${deletedEvents.length} existing events to prevent duplicates`);
+
     // Create events in Google Calendar using OAuth
     const createdEvents = [];
     const failedEvents = [];
@@ -335,11 +397,13 @@ serve(async (req) => {
       success: true, 
       eventsCreated: createdEvents.length,
       eventsFailed: failedEvents.length,
+      eventsDeleted: deletedEvents.length,
       callEvents: callEvents.length,
       offEvents: offEvents.length,
       message: createdEvents.length > 0 ? 'Schedule published to Google Calendar successfully!' : 'No events were created in Google Calendar.',
       createdEvents: createdEvents,
-      failedEvents: failedEvents
+      failedEvents: failedEvents,
+      deletedEvents: deletedEvents
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
