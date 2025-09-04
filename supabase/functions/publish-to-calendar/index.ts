@@ -263,9 +263,9 @@ serve(async (req) => {
     // Function to delete existing events in a calendar
     const deleteExistingEvents = async (calendarId: string, calendarName: string) => {
       try {
-        // List existing events in the date range
+        // List existing events in the date range - only get events that start within the block period
         const listUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
-          `timeMin=${blockStartDate}T00:00:00Z&timeMax=${new Date(blockEndDate + 'T23:59:59Z').toISOString()}&singleEvents=true`;
+          `timeMin=${blockStartDate}T00:00:00Z&timeMax=${blockEndDate}T23:59:59Z&singleEvents=true`;
         
         const listResponse = await fetch(listUrl, {
           headers: {
