@@ -18,6 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import ScheduleVisualization from "@/components/ScheduleVisualization";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { GoogleCalendarConnect } from "@/components/GoogleCalendarConnect";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, addWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -529,14 +530,16 @@ const AdminDashboard = () => {
     setPublishStatus(null);
     try {
       console.log('Calling supabase function with:', {
-        blockId: currentBlock.id
+        blockId: currentBlock.id,
+        userId: user?.id
       });
       const {
         data,
         error
       } = await supabase.functions.invoke('publish-to-calendar', {
         body: {
-          blockId: currentBlock.id
+          blockId: currentBlock.id,
+          userId: user?.id
         }
       });
       console.log('Supabase function response:', {
@@ -547,13 +550,13 @@ const AdminDashboard = () => {
       if (data.success) {
         setPublishStatus({
           type: 'success',
-          message: `Successfully prepared ${data.eventsCreated} events for Google Calendar (${data.callEvents} call events, ${data.offEvents} off events). ${data.message}`
+          message: `Successfully published ${data.eventsCreated} events to Google Calendar! (${data.callEvents} call events, ${data.offEvents} off events)`
         });
         setLastPublishResult(data);
         await fetchData(); // Refresh to show updated status
         toast({
-          title: "Success",
-          description: "Schedule published successfully"
+          title: "Success", 
+          description: "Schedule published to Google Calendar successfully!"
         });
       } else {
         throw new Error(data.error || 'Publication failed');
@@ -1871,19 +1874,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                   </Alert>}
 
                 <div className="space-y-4">
-                  <div className="p-4 border rounded-lg bg-muted/50">
-                    <h4 className="font-medium mb-2">Google Calendar Integration Status</h4>
-                     <p className="text-sm text-muted-foreground mb-3">
-                       The backend integration is ready for both calendars. To enable full Google Calendar publishing, you'll need to:
-                     </p>
-                     <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                       <li>• Set up Google Calendar OAuth 2.0 credentials</li>
-                       <li>• Configure user authentication flow</li>
-                       <li>• Connect to both target calendars:</li>
-                       <li className="ml-4">- On-Call Calendar: di4a2cdcs23acuqmb5rvbmba2k@group.calendar.google.com</li>
-                       <li className="ml-4">- Staffing Calendar: odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com</li>
-                     </ul>
-                  </div>
+                  <GoogleCalendarConnect onConnected={fetchData} />
 
                   <div className="flex gap-4">
                     <Button onClick={publishToCalendar} disabled={!currentBlock || assignments.length === 0 || publishing} className="bg-gradient-primary hover:opacity-90">
