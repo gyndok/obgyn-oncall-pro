@@ -9,7 +9,6 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const googleApiKey = Deno.env.get('GOOGLE_CALENDAR_API_KEY')!;
 
 // Calendar IDs
 const ON_CALL_CALENDAR_ID = 'di4a2cdcs23acuqmb5rvbmba2k@group.calendar.google.com';
@@ -22,7 +21,58 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-    const { blockId, calendarId = ON_CALL_CALENDAR_ID } = await req.json();
+    const { blockId, calendarId = ON_CALL_CALENDAR_ID, userId } = await req.json();
+
+    // Get user's Google access token
+    const { data: doctor, error: doctorError } = await supabase
+      .from('doctors')
+      .select('google_access_token, google_refresh_token, google_token_expires_at, name')
+      .eq('auth_user_id', userId)
+      .single();
+
+    if (doctorError || !doctor?.google_access_token) {
+      throw new Error('Google Calendar not connected. Please authorize Google Calendar access first.');
+    }
+
+    // Check if token is expired and refresh if needed
+    let accessToken = doctor.google_access_token;
+    const tokenExpiry = new Date(doctor.google_token_expires_at);
+    
+    if (tokenExpiry <= new Date()) {
+      // Token is expired, try to refresh
+      if (!doctor.google_refresh_token) {
+        throw new Error('Google Calendar token expired. Please re-authorize access.');
+      }
+
+      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')!,
+          client_secret: Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')!,
+          refresh_token: doctor.google_refresh_token,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      if (refreshResponse.ok) {
+        const tokens = await refreshResponse.json();
+        accessToken = tokens.access_token;
+        
+        // Update stored token
+        await supabase
+          .from('doctors')
+          .update({
+            google_access_token: tokens.access_token,
+            google_token_expires_at: new Date(Date.now() + (tokens.expires_in * 1000)).toISOString(),
+          })
+          .eq('auth_user_id', userId);
+      } else {
+        throw new Error('Failed to refresh Google Calendar token. Please re-authorize access.');
+      }
+    }
 
     console.log('Publishing block to Google Calendar:', { blockId, calendarId });
 
@@ -203,40 +253,71 @@ serve(async (req) => {
 
     const allEvents = [...callEvents, ...offEvents];
 
-    // Create events in Google Calendar using batch request
-    const batchBoundary = 'batch_' + Math.random().toString(36).substr(2, 9);
-    let batchBody = '';
+    // Create events in Google Calendar using OAuth
+    const createdEvents = [];
+    const failedEvents = [];
 
-    // Add call events to on-call calendar
-    callEvents.forEach((event, index) => {
-      batchBody += `--${batchBoundary}\r\n`;
-      batchBody += `Content-Type: application/http\r\n`;
-      batchBody += `Content-ID: call_${index + 1}\r\n\r\n`;
-      batchBody += `POST /calendar/v3/calendars/${encodeURIComponent(ON_CALL_CALENDAR_ID)}/events\r\n`;
-      batchBody += `Content-Type: application/json\r\n\r\n`;
-      batchBody += JSON.stringify(event) + '\r\n';
-    });
+    // Create call events in on-call calendar
+    for (const event of callEvents) {
+      try {
+        const response = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(ON_CALL_CALENDAR_ID)}/events`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(event),
+          }
+        );
 
-    // Add off events to staffing calendar
-    offEvents.forEach((event, index) => {
-      batchBody += `--${batchBoundary}\r\n`;
-      batchBody += `Content-Type: application/http\r\n`;
-      batchBody += `Content-ID: off_${index + 1}\r\n\r\n`;
-      batchBody += `POST /calendar/v3/calendars/${encodeURIComponent(STAFFING_CALENDAR_ID)}/events\r\n`;
-      batchBody += `Content-Type: application/json\r\n\r\n`;
-      batchBody += JSON.stringify(event) + '\r\n';
-    });
-    batchBody += `--${batchBoundary}--\r\n`;
+        if (response.ok) {
+          const createdEvent = await response.json();
+          createdEvents.push({ ...createdEvent, calendar: 'on-call' });
+          console.log(`Created call event: ${event.summary}`);
+        } else {
+          const errorText = await response.text();
+          console.error(`Failed to create call event: ${errorText}`);
+          failedEvents.push({ event, error: errorText });
+        }
+      } catch (error) {
+        console.error(`Error creating call event: ${error}`);
+        failedEvents.push({ event, error: error.message });
+      }
+    }
 
-    // Note: This is a simplified implementation. In production, you would need:
-    // 1. OAuth 2.0 authentication flow
-    // 2. Access tokens for the user's Google Calendar
-    // 3. Proper error handling for API rate limits
-    // 4. Batch request handling
+    // Create off events in staffing calendar
+    for (const event of offEvents) {
+      try {
+        const response = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(STAFFING_CALENDAR_ID)}/events`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(event),
+          }
+        );
 
-    console.log('Batch request prepared for Google Calendar API');
+        if (response.ok) {
+          const createdEvent = await response.json();
+          createdEvents.push({ ...createdEvent, calendar: 'staffing' });
+          console.log(`Created off event: ${event.summary}`);
+        } else {
+          const errorText = await response.text();
+          console.error(`Failed to create off event: ${errorText}`);
+          failedEvents.push({ event, error: errorText });
+        }
+      } catch (error) {
+        console.error(`Error creating off event: ${error}`);
+        failedEvents.push({ event, error: error.message });
+      }
+    }
 
-    // For now, we'll simulate success and store the calendar events in our database
+    console.log(`Successfully created ${createdEvents.length} events, ${failedEvents.length} failed`);
     const { error: updateError } = await supabase
       .from('blocks')
       .update({ 
@@ -252,11 +333,13 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true, 
-      eventsCreated: allEvents.length,
+      eventsCreated: createdEvents.length,
+      eventsFailed: failedEvents.length,
       callEvents: callEvents.length,
       offEvents: offEvents.length,
-      message: 'Schedule prepared for Google Calendar publication. OAuth setup required for actual calendar integration.',
-      events: allEvents
+      message: createdEvents.length > 0 ? 'Schedule published to Google Calendar successfully!' : 'No events were created in Google Calendar.',
+      createdEvents: createdEvents,
+      failedEvents: failedEvents
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
