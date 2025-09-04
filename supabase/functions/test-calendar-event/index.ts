@@ -35,23 +35,30 @@ serve(async (req) => {
     // Staffing calendar ID
     const staffingCalendarId = 'odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com';
 
-    // Create a test event for tomorrow at 2 PM (Central Time)
-    const today = new Date();
-    const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    // Create a test event for tomorrow at 2 PM in Central Time
+    const now = new Date();
     
-    // Create times in Central timezone
-    const startTime = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 14, 0, 0); // 2:00 PM
-    const endTime = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 15, 0, 0); // 3:00 PM
-
+    // Get tomorrow's date in Central Time (Chicago timezone)
+    // Add 1 day to current date
+    const tomorrowCentral = new Date();
+    tomorrowCentral.setDate(tomorrowCentral.getDate() + 1);
+    
+    // Format the date as YYYY-MM-DD for Central timezone
+    const year = tomorrowCentral.getFullYear();
+    const month = String(tomorrowCentral.getMonth() + 1).padStart(2, '0');
+    const day = String(tomorrowCentral.getDate()).padStart(2, '0');
+    
+    const tomorrowDateString = `${year}-${month}-${day}`;
+    
     const testEvent = {
       summary: 'Test Event - OB/GYN Staffing',
       description: 'This is a test event to verify Google Calendar integration is working.',
       start: {
-        dateTime: startTime.toISOString(),
+        dateTime: `${tomorrowDateString}T14:00:00`,
         timeZone: 'America/Chicago'
       },
       end: {
-        dateTime: endTime.toISOString(),
+        dateTime: `${tomorrowDateString}T15:00:00`,
         timeZone: 'America/Chicago'
       },
       colorId: '10' // Green color for test events
@@ -87,7 +94,7 @@ serve(async (req) => {
       eventId: createdEvent.id,
       eventLink: createdEvent.htmlLink,
       calendar: 'Staffing Calendar',
-      eventTime: `${startTime.toLocaleDateString()} at ${startTime.toLocaleTimeString()}`
+      eventTime: `${tomorrowDateString} at 2:00 PM CT`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
