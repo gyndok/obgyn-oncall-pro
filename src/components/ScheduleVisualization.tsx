@@ -107,7 +107,7 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
       }
     });
     
-    return Array.from(summary.values()).sort((a, b) => b.weekendWeekIndex - a.weekendWeekIndex);
+    return Array.from(summary.values()).sort((a, b) => a.weekendWeekIndex - b.weekendWeekIndex);
   };
 
   const doctorSummaryData = doctorSummary();
