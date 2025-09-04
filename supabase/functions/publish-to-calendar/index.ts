@@ -21,7 +21,7 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-    const { blockId, calendarId = ON_CALL_CALENDAR_ID, userId, testDoctorId } = await req.json();
+    const { blockId, calendarId = ON_CALL_CALENDAR_ID, userId } = await req.json();
 
     // Get user's Google access token
     const { data: doctor, error: doctorError } = await supabase
@@ -113,24 +113,14 @@ serve(async (req) => {
       throw new Error(`Failed to fetch doctor requests: ${requestsError.message}`);
     }
 
-    let filteredAssignments = assignments;
-    let filteredDoctorRequests = doctorRequests;
-    
-    // If testing a specific doctor, filter assignments and requests
-    if (testDoctorId) {
-      filteredAssignments = assignments.filter(a => a.doctor_id === testDoctorId);
-      filteredDoctorRequests = doctorRequests.filter(r => r.doctor_id === testDoctorId);
-      console.log(`Testing individual doctor: filtered to ${filteredAssignments.length} assignments and ${filteredDoctorRequests.length} requests`);
-    }
-
-    console.log(`Found ${filteredAssignments.length} assignments for block ${block.name}`);
-    console.log(`Found ${filteredDoctorRequests.length} doctor requests with unavailable dates`);
+    console.log(`Found ${assignments.length} assignments for block ${block.name}`);
+    console.log(`Found ${doctorRequests.length} doctor requests with unavailable dates`);
 
     // Process call assignments (existing logic)
     const callEvents = [];
     const processedDates = new Set();
 
-    for (const assignment of filteredAssignments) {
+    for (const assignment of assignments) {
       if (processedDates.has(assignment.date)) continue;
 
       const date = new Date(assignment.date);
@@ -140,7 +130,7 @@ serve(async (req) => {
       if (dayOfWeek >= 5 || dayOfWeek === 0) {
         // Find the complete weekend for this doctor
         const doctorId = assignment.doctor_id;
-        const weekendAssignments = filteredAssignments.filter(a => 
+        const weekendAssignments = assignments.filter(a => 
           a.doctor_id === doctorId && 
           !processedDates.has(a.date)
         );
@@ -235,7 +225,7 @@ serve(async (req) => {
     // Process unavailable dates for "Off" events
     const offEvents = [];
     
-    for (const request of filteredDoctorRequests) {
+    for (const request of doctorRequests) {
       if (request.unavailable_dates && Array.isArray(request.unavailable_dates)) {
         const lastName = request.doctor.name.split(' ').pop() || request.doctor.name;
         

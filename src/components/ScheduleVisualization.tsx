@@ -1,9 +1,7 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
-import { Calendar } from "lucide-react";
 
 // Helper function to parse date-only strings as local dates (avoiding UTC timezone issues)
 const parseLocalDate = (dateString: string) => {
@@ -32,16 +30,9 @@ interface Block {
 interface ScheduleVisualizationProps {
   assignments: Assignment[];
   block: Block;
-  onTestPublishDoctor?: (doctorId: string, doctorName: string) => void;
-  testPublishingDoctors?: Set<string>;
 }
 
-const ScheduleVisualization = ({ assignments, block, onTestPublishDoctor, testPublishingDoctors }: ScheduleVisualizationProps) => {
-  // Get unique doctor IDs for the assignments
-  const getDoctorId = (doctorName: string) => {
-    const assignment = assignments.find(a => a.doctors.name === doctorName);
-    return assignment?.doctor_id || '';
-  };
+const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProps) => {
   // Process assignments into week-based structure
   const weeklySchedule = () => {
     const weeks: any[] = [];
@@ -245,20 +236,6 @@ const ScheduleVisualization = ({ assignments, block, onTestPublishDoctor, testPu
                       ))}
                     </div>
                   </div>
-                  {onTestPublishDoctor && (
-                    <div className="mt-3 pt-3 border-t border-border">
-                      <Button
-                        onClick={() => onTestPublishDoctor(getDoctorId(doctor.name), doctor.name)}
-                        disabled={testPublishingDoctors?.has(getDoctorId(doctor.name))}
-                        variant="outline"
-                        size="sm"
-                        className="w-full text-blue-600 border-blue-600 hover:bg-blue-50"
-                      >
-                        <Calendar className="h-3 w-3 mr-1" />
-                        {testPublishingDoctors?.has(getDoctorId(doctor.name)) ? "Publishing..." : "Test Publish"}
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
