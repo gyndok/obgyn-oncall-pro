@@ -35,30 +35,17 @@ serve(async (req) => {
     // Staffing calendar ID
     const staffingCalendarId = 'odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com';
 
-    // Create a test event for tomorrow at 2 PM in Central Time
-    const now = new Date();
-    
-    // Get tomorrow's date in Central Time (Chicago timezone)
-    // Add 1 day to current date
-    const tomorrowCentral = new Date();
-    tomorrowCentral.setDate(tomorrowCentral.getDate() + 1);
-    
-    // Format the date as YYYY-MM-DD for Central timezone
-    const year = tomorrowCentral.getFullYear();
-    const month = String(tomorrowCentral.getMonth() + 1).padStart(2, '0');
-    const day = String(tomorrowCentral.getDate()).padStart(2, '0');
-    
-    const tomorrowDateString = `${year}-${month}-${day}`;
-    
+    // Create a test event for September 4th at 2 PM in Central Time
+    // Explicitly setting the date to avoid timezone confusion
     const testEvent = {
       summary: 'Test Event - OB/GYN Staffing',
       description: 'This is a test event to verify Google Calendar integration is working.',
       start: {
-        dateTime: `${tomorrowDateString}T14:00:00`,
+        dateTime: '2025-09-04T14:00:00',
         timeZone: 'America/Chicago'
       },
       end: {
-        dateTime: `${tomorrowDateString}T15:00:00`,
+        dateTime: '2025-09-04T15:00:00',
         timeZone: 'America/Chicago'
       },
       colorId: '10' // Green color for test events
@@ -94,7 +81,7 @@ serve(async (req) => {
       eventId: createdEvent.id,
       eventLink: createdEvent.htmlLink,
       calendar: 'Staffing Calendar',
-      eventTime: `${tomorrowDateString} at 2:00 PM CT`
+      eventTime: `September 4th at 2:00 PM CT`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
