@@ -164,6 +164,13 @@ const AdminDashboard = () => {
     message: string;
   } | null>(null);
 
+  // Mass email state
+  const [sendingEmails, setSendingEmails] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
   // Never submitted tracking state
   const [neverSubmittedDoctors, setNeverSubmittedDoctors] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -677,6 +684,66 @@ const AdminDashboard = () => {
       });
     } finally {
       setUnpublishing(false);
+    }
+  };
+
+  // Send mass email with schedule details
+  const sendMassEmail = async () => {
+    if (!currentBlock || currentBlock.status !== 'published') {
+      toast({
+        title: "Cannot Send Emails",
+        description: "Schedule must be published before sending emails to doctors",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setSendingEmails(true);
+    setEmailStatus(null);
+    
+    try {
+      console.log('Sending mass email with schedule details...');
+      
+      const { data, error } = await supabase.functions.invoke('send-schedule-email', {
+        body: {
+          blockId: currentBlock.id
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message || 'Failed to send mass emails');
+      }
+      
+      console.log('Mass email result:', data);
+      
+      if (data.success) {
+        const { summary } = data;
+        setEmailStatus({
+          type: 'success',
+          message: `Successfully sent ${summary.successfulEmails}/${summary.totalEmails} emails`
+        });
+        
+        toast({
+          title: "Mass Email Sent",
+          description: `Successfully sent schedule emails to ${summary.successfulEmails}/${summary.totalEmails} doctors`
+        });
+      } else {
+        throw new Error(data.error || 'Unknown error occurred');
+      }
+      
+    } catch (error: any) {
+      console.error('Error sending mass emails:', error);
+      setEmailStatus({
+        type: 'error',
+        message: error.message || 'Failed to send mass emails'
+      });
+      toast({
+        title: "Mass Email Failed",
+        description: error.message || "Failed to send schedule emails to doctors",
+        variant: "destructive"
+      });
+    } finally {
+      setSendingEmails(false);
     }
   };
 
@@ -1993,6 +2060,13 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     </AlertDescription>
                   </Alert>}
 
+                  {emailStatus && <Alert className={emailStatus.type === 'error' ? "border-destructive" : "border-green-500"}>
+                    {emailStatus.type === 'error' ? <AlertTriangle className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                    <AlertDescription>
+                      {emailStatus.message}
+                    </AlertDescription>
+                  </Alert>}
+
                   <div className="flex gap-4 flex-wrap">
                     <Button onClick={testCalendar} disabled={testingCalendar} variant="outline" size="sm">
                       {testingCalendar ? "Testing..." : "Test Calendar"}
@@ -2004,6 +2078,10 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     </Button>
                     <Button variant="outline" disabled={!currentBlock || currentBlock.status !== 'published' || unpublishing} onClick={unpublishSchedule}>
                       {unpublishing ? "Unpublishing..." : "Unpublish Schedule"}
+                    </Button>
+                    <Button onClick={sendMassEmail} disabled={!currentBlock || currentBlock.status !== 'published' || sendingEmails} className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <Mail className="h-4 w-4 mr-2" />
+                      {sendingEmails ? "Sending..." : "Email Schedule to All Doctors"}
                     </Button>
                   </div>
 
