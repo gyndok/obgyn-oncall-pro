@@ -93,8 +93,9 @@ serve(async (req) => {
           const endDate = new Date(consecutiveDays[consecutiveDays.length - 1].date);
           endDate.setDate(endDate.getDate() + 1); // End date is exclusive in Google Calendar
 
+          const lastName = assignment.doctor.name.split(' ').pop() || assignment.doctor.name;
           events.push({
-            summary: `On-Call: Dr. ${assignment.doctor.name} (Weekend)`,
+            summary: `${lastName} Call`,
             description: `Medical on-call duty for ${block.name}\nDates: ${consecutiveDays.map(d => new Date(d.date).toLocaleDateString()).join(', ')}`,
             start: {
               date: startDate
@@ -113,8 +114,9 @@ serve(async (req) => {
           const endDate = new Date(assignment.date);
           endDate.setDate(endDate.getDate() + 1);
 
+          const lastName = assignment.doctor.name.split(' ').pop() || assignment.doctor.name;
           events.push({
-            summary: `On-Call: Dr. ${assignment.doctor.name}`,
+            summary: `${lastName} Call`,
             description: `Medical on-call duty for ${block.name}`,
             start: {
               date: startDate
@@ -133,8 +135,9 @@ serve(async (req) => {
         const endDate = new Date(assignment.date);
         endDate.setDate(endDate.getDate() + 1);
 
+        const lastName = assignment.doctor.name.split(' ').pop() || assignment.doctor.name;
         events.push({
-          summary: `On-Call: Dr. ${assignment.doctor.name}`,
+          summary: `${lastName} Call`,
           description: `Medical on-call duty for ${block.name}`,
           start: {
             date: startDate
