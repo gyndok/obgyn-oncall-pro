@@ -12,6 +12,7 @@ const corsHeaders = {
 
 interface ScheduleEmailRequest {
   blockId: string;
+  customMessage?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -21,7 +22,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { blockId }: ScheduleEmailRequest = await req.json();
+    const { blockId, customMessage }: ScheduleEmailRequest = await req.json();
 
     if (!blockId) {
       throw new Error('Block ID is required');
@@ -128,6 +129,13 @@ const handler = async (req: Request): Promise<Response> => {
               <h2 style="color: #2563eb;">Your Call Schedule</h2>
               
               <p>Dear Dr. ${doctor.name},</p>
+              
+              ${customMessage ? `
+              <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
+                <h4 style="margin: 0 0 10px 0; color: #1e40af;">Message from Administration</h4>
+                <p style="margin: 0; color: #1e40af; white-space: pre-wrap;">${customMessage}</p>
+              </div>
+              ` : ''}
               
               <p>Your call schedule for the following period has been finalized:</p>
               

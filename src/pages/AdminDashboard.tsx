@@ -170,6 +170,7 @@ const AdminDashboard = () => {
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+  const [customEmailMessage, setCustomEmailMessage] = useState("");
 
   // Never submitted tracking state
   const [neverSubmittedDoctors, setNeverSubmittedDoctors] = useState<Set<string>>(new Set());
@@ -706,7 +707,8 @@ const AdminDashboard = () => {
       
       const { data, error } = await supabase.functions.invoke('send-schedule-email', {
         body: {
-          blockId: currentBlock.id
+          blockId: currentBlock.id,
+          customMessage: customEmailMessage.trim() || null
         }
       });
       
@@ -2066,6 +2068,25 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       {emailStatus.message}
                     </AlertDescription>
                   </Alert>}
+
+                  {currentBlock && currentBlock.status === 'published' && (
+                    <div className="space-y-3 p-4 border rounded bg-muted/30">
+                      <Label htmlFor="custom-email-message" className="text-sm font-medium">
+                        Custom Message (Optional)
+                      </Label>
+                      <Textarea
+                        id="custom-email-message"
+                        placeholder="Add a custom message to include in the schedule emails..."
+                        value={customEmailMessage}
+                        onChange={(e) => setCustomEmailMessage(e.target.value)}
+                        className="min-h-[80px]"
+                        disabled={sendingEmails}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        This message will be included at the beginning of each doctor's schedule email.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="flex gap-4 flex-wrap">
                     <Button onClick={testCalendar} disabled={testingCalendar} variant="outline" size="sm">
