@@ -88,7 +88,8 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
         summary.set(doctorName, {
           name: doctorName,
           weekend: "",
-          weekdays: []
+          weekdays: [],
+          weekendWeekIndex: 0
         });
       }
       
@@ -98,6 +99,7 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
         const weekStartDate = addDays(parseLocalDate(block.start_monday_date), (assignment.week_index - 1) * 7);
         const weekEndDate = addDays(weekStartDate, 6);
         doctor.weekend = `Week ${assignment.week_index} (${format(addDays(weekStartDate, 4), 'MMM d')}-${format(weekEndDate, 'd')})`;
+        doctor.weekendWeekIndex = assignment.week_index;
       } else if (!assignment.is_weekend) {
         // Weekday assignment - show day and date like "Mon 11/3"
         const assignmentDate = parseLocalDate(assignment.date);
@@ -105,7 +107,7 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
       }
     });
     
-    return Array.from(summary.values());
+    return Array.from(summary.values()).sort((a, b) => b.weekendWeekIndex - a.weekendWeekIndex);
   };
 
   const doctorSummaryData = doctorSummary();
