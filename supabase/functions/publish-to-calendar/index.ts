@@ -11,6 +11,10 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const googleApiKey = Deno.env.get('GOOGLE_CALENDAR_API_KEY')!;
 
+// Calendar IDs
+const ON_CALL_CALENDAR_ID = 'di4a2cdcs23acuqmb5rvbmba2k@group.calendar.google.com';
+const STAFFING_CALENDAR_ID = 'odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com';
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -18,7 +22,7 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-    const { blockId, calendarId = 'primary' } = await req.json();
+    const { blockId, calendarId = ON_CALL_CALENDAR_ID } = await req.json();
 
     console.log('Publishing block to Google Calendar:', { blockId, calendarId });
 
@@ -46,10 +50,24 @@ serve(async (req) => {
       throw new Error(`Failed to fetch assignments: ${assignmentsError.message}`);
     }
 
-    console.log(`Found ${assignments.length} assignments for block ${block.name}`);
+    // Get doctor requests for unavailable dates
+    const { data: doctorRequests, error: requestsError } = await supabase
+      .from('doctor_requests')
+      .select(`
+        *,
+        doctor:doctors(name, email)
+      `)
+      .eq('block_id', blockId);
 
-    // Group assignments by doctor to create multi-day events for weekends
-    const events = [];
+    if (requestsError) {
+      throw new Error(`Failed to fetch doctor requests: ${requestsError.message}`);
+    }
+
+    console.log(`Found ${assignments.length} assignments for block ${block.name}`);
+    console.log(`Found ${doctorRequests.length} doctor requests with unavailable dates`);
+
+    // Process call assignments (existing logic)
+    const callEvents = [];
     const processedDates = new Set();
 
     for (const assignment of assignments) {
@@ -94,7 +112,7 @@ serve(async (req) => {
           endDate.setDate(endDate.getDate() + 1); // End date is exclusive in Google Calendar
 
           const lastName = assignment.doctor.name.split(' ').pop() || assignment.doctor.name;
-          events.push({
+          callEvents.push({
             summary: `${lastName} Call`,
             description: `Medical on-call duty for ${block.name}\nDates: ${consecutiveDays.map(d => new Date(d.date).toLocaleDateString()).join(', ')}`,
             start: {
@@ -115,7 +133,7 @@ serve(async (req) => {
           endDate.setDate(endDate.getDate() + 1);
 
           const lastName = assignment.doctor.name.split(' ').pop() || assignment.doctor.name;
-          events.push({
+          callEvents.push({
             summary: `${lastName} Call`,
             description: `Medical on-call duty for ${block.name}`,
             start: {
@@ -136,7 +154,7 @@ serve(async (req) => {
         endDate.setDate(endDate.getDate() + 1);
 
         const lastName = assignment.doctor.name.split(' ').pop() || assignment.doctor.name;
-        events.push({
+        callEvents.push({
           summary: `${lastName} Call`,
           description: `Medical on-call duty for ${block.name}`,
           start: {
@@ -152,17 +170,59 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Created ${events.length} calendar events`);
+    console.log(`Created ${callEvents.length} call calendar events`);
+
+    // Process unavailable dates for "Off" events
+    const offEvents = [];
+    
+    for (const request of doctorRequests) {
+      if (request.unavailable_dates && Array.isArray(request.unavailable_dates)) {
+        const lastName = request.doctor.name.split(' ').pop() || request.doctor.name;
+        
+        for (const dateStr of request.unavailable_dates) {
+          const date = new Date(dateStr);
+          const endDate = new Date(date);
+          endDate.setDate(endDate.getDate() + 1);
+          
+          offEvents.push({
+            summary: `${lastName} Off`,
+            description: `Doctor unavailable for on-call duty - ${block.name}`,
+            start: {
+              date: date.toISOString().split('T')[0]
+            },
+            end: {
+              date: endDate.toISOString().split('T')[0]
+            },
+            colorId: '8' // Red color for off days
+          });
+        }
+      }
+    }
+
+    console.log(`Created ${offEvents.length} off calendar events`);
+
+    const allEvents = [...callEvents, ...offEvents];
 
     // Create events in Google Calendar using batch request
     const batchBoundary = 'batch_' + Math.random().toString(36).substr(2, 9);
     let batchBody = '';
 
-    events.forEach((event, index) => {
+    // Add call events to on-call calendar
+    callEvents.forEach((event, index) => {
       batchBody += `--${batchBoundary}\r\n`;
       batchBody += `Content-Type: application/http\r\n`;
-      batchBody += `Content-ID: ${index + 1}\r\n\r\n`;
-      batchBody += `POST /calendar/v3/calendars/${encodeURIComponent(calendarId)}/events\r\n`;
+      batchBody += `Content-ID: call_${index + 1}\r\n\r\n`;
+      batchBody += `POST /calendar/v3/calendars/${encodeURIComponent(ON_CALL_CALENDAR_ID)}/events\r\n`;
+      batchBody += `Content-Type: application/json\r\n\r\n`;
+      batchBody += JSON.stringify(event) + '\r\n';
+    });
+
+    // Add off events to staffing calendar
+    offEvents.forEach((event, index) => {
+      batchBody += `--${batchBoundary}\r\n`;
+      batchBody += `Content-Type: application/http\r\n`;
+      batchBody += `Content-ID: off_${index + 1}\r\n\r\n`;
+      batchBody += `POST /calendar/v3/calendars/${encodeURIComponent(STAFFING_CALENDAR_ID)}/events\r\n`;
       batchBody += `Content-Type: application/json\r\n\r\n`;
       batchBody += JSON.stringify(event) + '\r\n';
     });
@@ -182,7 +242,7 @@ serve(async (req) => {
       .update({ 
         status: 'published',
         published_at: new Date().toISOString(),
-        calendar_events: events
+        calendar_events: allEvents
       })
       .eq('id', blockId);
 
@@ -192,9 +252,11 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true, 
-      eventsCreated: events.length,
+      eventsCreated: allEvents.length,
+      callEvents: callEvents.length,
+      offEvents: offEvents.length,
       message: 'Schedule prepared for Google Calendar publication. OAuth setup required for actual calendar integration.',
-      events: events
+      events: allEvents
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

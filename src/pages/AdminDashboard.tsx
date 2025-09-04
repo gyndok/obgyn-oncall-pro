@@ -536,8 +536,7 @@ const AdminDashboard = () => {
         error
       } = await supabase.functions.invoke('publish-to-calendar', {
         body: {
-          blockId: currentBlock.id,
-          calendarId: 'di4a2cdcs23acuqmb5rvbmba2k@group.calendar.google.com'
+          blockId: currentBlock.id
         }
       });
       console.log('Supabase function response:', {
@@ -548,7 +547,7 @@ const AdminDashboard = () => {
       if (data.success) {
         setPublishStatus({
           type: 'success',
-          message: `Successfully prepared ${data.eventsCreated} events for Google Calendar. ${data.message}`
+          message: `Successfully prepared ${data.eventsCreated} events for Google Calendar (${data.callEvents} call events, ${data.offEvents} off events). ${data.message}`
         });
         setLastPublishResult(data);
         await fetchData(); // Refresh to show updated status
@@ -1874,14 +1873,16 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                 <div className="space-y-4">
                   <div className="p-4 border rounded-lg bg-muted/50">
                     <h4 className="font-medium mb-2">Google Calendar Integration Status</h4>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      The backend integration is ready. To enable full Google Calendar publishing, you'll need to:
-                    </p>
-                    <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                      <li>• Set up Google Calendar OAuth 2.0 credentials</li>
-                      <li>• Configure user authentication flow</li>
-                      <li>• Connect to your target calendar</li>
-                    </ul>
+                     <p className="text-sm text-muted-foreground mb-3">
+                       The backend integration is ready for both calendars. To enable full Google Calendar publishing, you'll need to:
+                     </p>
+                     <ul className="text-sm text-muted-foreground space-y-1 ml-4">
+                       <li>• Set up Google Calendar OAuth 2.0 credentials</li>
+                       <li>• Configure user authentication flow</li>
+                       <li>• Connect to both target calendars:</li>
+                       <li className="ml-4">- On-Call Calendar: di4a2cdcs23acuqmb5rvbmba2k@group.calendar.google.com</li>
+                       <li className="ml-4">- Staffing Calendar: odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com</li>
+                     </ul>
                   </div>
 
                   <div className="flex gap-4">
@@ -1894,24 +1895,30 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     </Button>
                   </div>
 
-                  {lastPublishResult && <div className="p-3 border rounded bg-muted/30">
-                      <p className="text-sm font-medium">Last Publication:</p>
-                      <p className="text-sm text-muted-foreground">
-                        Created {lastPublishResult.eventsCreated} calendar events
-                      </p>
-                      {lastPublishResult.events && <details className="mt-2">
-                          <summary className="text-sm cursor-pointer text-primary hover:underline">
-                            View Events ({lastPublishResult.events.length})
-                          </summary>
-                          <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
-                            {lastPublishResult.events.map((event, index) => <div key={index} className="text-xs p-2 bg-background rounded border">
-                                <strong>{event.summary}</strong>
-                                <br />
-                                {event.start.date} - {event.end.date}
-                              </div>)}
-                          </div>
-                        </details>}
-                    </div>}
+                   {lastPublishResult && <div className="p-3 border rounded bg-muted/30">
+                       <p className="text-sm font-medium">Last Publication:</p>
+                       <p className="text-sm text-muted-foreground mb-2">
+                         Created {lastPublishResult.eventsCreated} total calendar events
+                         ({lastPublishResult.callEvents || 0} call events, {lastPublishResult.offEvents || 0} off events)
+                       </p>
+                       <div className="text-xs text-muted-foreground mb-2">
+                         • Call events → On-Call Calendar
+                         <br />
+                         • Off events → Staffing Calendar
+                       </div>
+                       {lastPublishResult.events && <details className="mt-2">
+                           <summary className="text-sm cursor-pointer text-primary hover:underline">
+                             View Events ({lastPublishResult.events.length})
+                           </summary>
+                           <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                             {lastPublishResult.events.map((event, index) => <div key={index} className="text-xs p-2 bg-background rounded border">
+                                 <strong>{event.summary}</strong>
+                                 <br />
+                                 {event.start.date} - {event.end.date}
+                               </div>)}
+                           </div>
+                         </details>}
+                     </div>}
                 </div>
               </CardContent>
             </Card>
