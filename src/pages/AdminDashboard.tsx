@@ -157,6 +157,13 @@ const AdminDashboard = () => {
     message: string;
   } | null>(null);
 
+  // Unpublish state
+  const [unpublishing, setUnpublishing] = useState(false);
+  const [unpublishStatus, setUnpublishStatus] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
   // Never submitted tracking state
   const [neverSubmittedDoctors, setNeverSubmittedDoctors] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -622,6 +629,54 @@ const AdminDashboard = () => {
       });
     } finally {
       setTestingCalendar(false);
+    }
+  };
+
+  const unpublishSchedule = async () => {
+    if (!currentBlock || !user) return;
+    
+    setUnpublishing(true);
+    setUnpublishStatus(null);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('unpublish-schedule', {
+        body: { 
+          blockId: currentBlock.id,
+          userId: user.id
+        }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success) {
+        setUnpublishStatus({
+          type: 'success',
+          message: data.message
+        });
+        // Clear the last publish result since we've unpublished
+        setLastPublishResult(null);
+        // Refresh data to show updated status
+        await fetchData();
+        toast({
+          title: "Success",
+          description: `Unpublished successfully! ${data.eventsDeleted} events removed.`
+        });
+      } else {
+        throw new Error(data.error || 'Unpublish failed');
+      }
+    } catch (error) {
+      console.error('Error unpublishing schedule:', error);
+      setUnpublishStatus({
+        type: 'error',
+        message: `Unpublish failed: ${error.message}`
+      });
+      toast({
+        title: "Error",
+        description: "Failed to unpublish schedule",
+        variant: "destructive"
+      });
+    } finally {
+      setUnpublishing(false);
     }
   };
 
@@ -1931,6 +1986,13 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     </AlertDescription>
                   </Alert>}
 
+                  {unpublishStatus && <Alert className={unpublishStatus.type === 'error' ? "border-destructive" : "border-green-500"}>
+                    {unpublishStatus.type === 'error' ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                    <AlertDescription>
+                      {unpublishStatus.message}
+                    </AlertDescription>
+                  </Alert>}
+
                   <div className="flex gap-4 flex-wrap">
                     <Button onClick={testCalendar} disabled={testingCalendar} variant="outline" size="sm">
                       {testingCalendar ? "Testing..." : "Test Calendar"}
@@ -1940,8 +2002,8 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       <Upload className="h-4 w-4 mr-2" />
                       {publishing ? "Publishing..." : "Publish to Calendar"}
                     </Button>
-                    <Button variant="outline" disabled={!currentBlock || currentBlock.status !== 'published' || saving} onClick={() => updateBlockStatus(currentBlock?.id || '', 'closed')}>
-                      Unpublish Schedule
+                    <Button variant="outline" disabled={!currentBlock || currentBlock.status !== 'published' || unpublishing} onClick={unpublishSchedule}>
+                      {unpublishing ? "Unpublishing..." : "Unpublish Schedule"}
                     </Button>
                   </div>
 

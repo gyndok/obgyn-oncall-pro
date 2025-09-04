@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.test-calendar-event]
 verify_jwt = false
+
+[functions.unpublish-schedule]
+verify_jwt = false
