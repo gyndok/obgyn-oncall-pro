@@ -2,3 +2,6 @@ project_id = "yjjxsirrirpnrzrxpjvj"
 
 [functions.google-calendar-auth]
 verify_jwt = false
+
+[functions.test-calendar-event]
+verify_jwt = false

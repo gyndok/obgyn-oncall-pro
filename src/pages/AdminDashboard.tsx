@@ -150,6 +150,13 @@ const AdminDashboard = () => {
   } | null>(null);
   const [lastPublishResult, setLastPublishResult] = useState<any>(null);
 
+  // Calendar testing state
+  const [testingCalendar, setTestingCalendar] = useState(false);
+  const [testStatus, setTestStatus] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
   // Never submitted tracking state
   const [neverSubmittedDoctors, setNeverSubmittedDoctors] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -574,6 +581,47 @@ const AdminDashboard = () => {
       });
     } finally {
       setPublishing(false);
+    }
+  };
+
+  const testCalendar = async () => {
+    if (!user) return;
+    
+    setTestingCalendar(true);
+    setTestStatus(null);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('test-calendar-event', {
+        body: { userId: user.id }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success) {
+        setTestStatus({
+          type: 'success',
+          message: `Test event created! Check the Staffing Calendar at ${data.eventTime}`
+        });
+        toast({
+          title: "Success",
+          description: "Test event created successfully in Staffing Calendar"
+        });
+      } else {
+        throw new Error(data.error || 'Test failed');
+      }
+    } catch (error) {
+      console.error('Error testing calendar:', error);
+      setTestStatus({
+        type: 'error',
+        message: `Test failed: ${error.message}`
+      });
+      toast({
+        title: "Error",
+        description: "Failed to create test event",
+        variant: "destructive"
+      });
+    } finally {
+      setTestingCalendar(false);
     }
   };
 
@@ -1876,7 +1924,18 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                 <div className="space-y-4">
                   <GoogleCalendarConnect onConnected={fetchData} />
 
-                  <div className="flex gap-4">
+                  {testStatus && <Alert className={testStatus.type === 'error' ? "border-destructive" : "border-green-500"}>
+                    {testStatus.type === 'error' ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                    <AlertDescription>
+                      {testStatus.message}
+                    </AlertDescription>
+                  </Alert>}
+
+                  <div className="flex gap-4 flex-wrap">
+                    <Button onClick={testCalendar} disabled={testingCalendar} variant="outline" size="sm">
+                      {testingCalendar ? "Testing..." : "Test Calendar"}
+                    </Button>
+                    
                     <Button onClick={publishToCalendar} disabled={!currentBlock || assignments.length === 0 || publishing} className="bg-gradient-primary hover:opacity-90">
                       <Upload className="h-4 w-4 mr-2" />
                       {publishing ? "Publishing..." : "Publish to Calendar"}
