@@ -178,12 +178,14 @@ const handler = async (req: Request): Promise<Response> => {
           `,
         });
 
+        console.log(`Resend API response for ${doctor.name}:`, JSON.stringify(emailResponse));
         console.log(`Email sent to ${doctor.name} (${doctor.email})`);
         emailResults.push({
           doctor: doctor.name,
           email: doctor.email,
           success: true,
-          assignmentCount: doctorAssignments.length
+          assignmentCount: doctorAssignments.length,
+          resendResponse: emailResponse
         });
 
       } catch (error: any) {
