@@ -121,35 +121,39 @@ const handler = async (req: Request): Promise<Response> => {
         const blockTitle = `Call Schedule: ${new Date(block.start_monday_date).toLocaleDateString()} - ${new Date(block.end_sunday_date).toLocaleDateString()}`;
 
         const emailResponse = await resend.emails.send({
-          from: "Call Schedule <onboarding@resend.dev>",
+          from: "Call Schedule Portal <onboarding@resend.dev>",
           to: [doctor.email],
           subject: `Your Call Schedule - ${blockTitle}`,
           html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #2563eb;">Your Call Schedule</h2>
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #333; text-align: center; margin-bottom: 30px;">Your Call Schedule</h1>
               
-              <p>Dear Dr. ${doctor.name},</p>
+              <p style="color: #666; font-size: 16px; line-height: 1.5; margin-bottom: 20px;">
+                Dear Dr. ${doctor.name},
+              </p>
               
               ${customMessage ? `
-              <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
-                <h4 style="margin: 0 0 10px 0; color: #1e40af;">Message from Administration</h4>
-                <p style="margin: 0; color: #1e40af; white-space: pre-wrap;">${customMessage}</p>
+              <div style="background-color: #f0f9ff; padding: 15px; margin: 20px 0;">
+                <h3 style="margin: 0 0 10px 0; color: #333;">Message from Administration</h3>
+                <p style="margin: 0; color: #666; white-space: pre-wrap;">${customMessage}</p>
               </div>
               ` : ''}
               
-              <p>Your call schedule for the following period has been finalized:</p>
+              <p style="color: #666; font-size: 16px; line-height: 1.5; margin-bottom: 20px;">
+                Your call schedule for the following period has been finalized:
+              </p>
               
-              <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <strong>${blockTitle}</strong>
+              <div style="background-color: #f9f9f9; padding: 15px; margin: 20px 0;">
+                <strong style="color: #333;">${blockTitle}</strong>
               </div>
               
-              <h3 style="color: #1f2937;">Your Assignments:</h3>
+              <h2 style="color: #333; margin: 30px 0 20px 0;">Your Assignments:</h2>
               ${scheduleHtml}
               
               ${weekNumbers.length > 0 ? `
-              <div style="background-color: #dbeafe; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
-                <h4 style="margin: 0 0 10px 0; color: #1e40af;">Summary</h4>
-                <p style="margin: 0; color: #1e40af;">
+              <div style="background-color: #f0f9ff; padding: 15px; margin: 20px 0;">
+                <h3 style="margin: 0 0 10px 0; color: #333;">Summary</h3>
+                <p style="margin: 0; color: #666;">
                   Total assignments: <strong>${doctorAssignments.length}</strong><br>
                   Weekend calls: <strong>${doctorAssignments.filter(a => a.is_weekend).length}</strong><br>
                   Weekday calls: <strong>${doctorAssignments.filter(a => !a.is_weekend).length}</strong>
@@ -157,13 +161,18 @@ const handler = async (req: Request): Promise<Response> => {
               </div>
               ` : ''}
               
-              <p>Please review your schedule and contact the administration team if you have any questions or concerns.</p>
+              <p style="color: #666; font-size: 16px; line-height: 1.5; margin: 20px 0;">
+                Please review your schedule and contact the administration team if you have any questions or concerns.
+              </p>
               
-              <p>Thank you for your participation.</p>
+              <p style="color: #666; font-size: 16px; line-height: 1.5; margin: 20px 0;">
+                Thank you for your participation.
+              </p>
               
-              <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
-              <p style="font-size: 12px; color: #6b7280;">
-                This is an automated email. Please do not reply to this email.
+              <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+              
+              <p style="color: #999; font-size: 12px; text-align: center;">
+                Call Schedule Portal - This is an automated email. Please do not reply.
               </p>
             </div>
           `,
