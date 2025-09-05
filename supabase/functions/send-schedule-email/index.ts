@@ -68,16 +68,25 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Found ${doctors?.length || 0} doctors and ${assignments?.length || 0} assignments`);
 
     const emailResults = [];
+    let processedCount = 0;
 
     // Send email to each doctor with their schedule
     for (let i = 0; i < (doctors?.length || 0); i++) {
       const doctor = doctors[i];
-      console.log(`Processing doctor ${i + 1}/${doctors?.length}: ${doctor.name} (${doctor.email})`);
+      processedCount++;
       
       try {
+        console.log(`[${processedCount}/${doctors?.length}] Processing doctor: ${doctor.name} (${doctor.email})`);
+        
         // Get this doctor's assignments
         const doctorAssignments = assignments?.filter(a => a.doctor_id === doctor.id) || [];
         console.log(`Found ${doctorAssignments.length} assignments for ${doctor.name}`);
+        
+        // Skip delay for first email
+        if (i > 0) {
+          console.log(`Waiting 700ms before processing ${doctor.name}...`);
+          await new Promise(resolve => setTimeout(resolve, 700));
+        }
         
         // Group assignments by week
         const weeklySchedule: Record<number, any[]> = {};
@@ -124,7 +133,7 @@ const handler = async (req: Request): Promise<Response> => {
 
         const blockTitle = `Call Schedule: ${new Date(block.start_monday_date).toLocaleDateString()} - ${new Date(block.end_sunday_date).toLocaleDateString()}`;
 
-        console.log(`Attempting to send email to ${doctor.name} (${doctor.email})`);
+        console.log(`Sending email to ${doctor.name}...`);
 
         const emailResponse = await resend.emails.send({
           from: "Call Schedule Portal <onboarding@resend.dev>",
@@ -184,7 +193,7 @@ const handler = async (req: Request): Promise<Response> => {
           `,
         });
 
-        console.log(`✓ Successfully sent email to ${doctor.name} (${doctor.email}). Response ID: ${emailResponse?.id}`);
+        console.log(`✓ SUCCESS: Email sent to ${doctor.name} (Response ID: ${emailResponse?.id})`);
         emailResults.push({
           doctor: doctor.name,
           email: doctor.email,
@@ -193,23 +202,21 @@ const handler = async (req: Request): Promise<Response> => {
           resendId: emailResponse?.id
         });
 
-        // Add delay to respect Resend rate limit (2 requests per second)
-        // Wait 600ms between emails to be safe
-        if (i < (doctors?.length || 0) - 1) { // Don't delay after the last email
-          console.log(`Waiting 600ms before next email...`);
-          await new Promise(resolve => setTimeout(resolve, 600));
-        }
-
       } catch (error: any) {
-        console.error(`✗ Failed to send email to ${doctor.name} (${doctor.email}):`, error);
+        console.error(`✗ FAILED: Email to ${doctor.name} - Error: ${error.message}`);
         emailResults.push({
           doctor: doctor.name,
           email: doctor.email,
           success: false,
           error: error.message
         });
+        
+        // Continue to next doctor even if this one failed
+        continue;
       }
     }
+
+    console.log(`Email processing complete. Processed ${processedCount} doctors.`);
 
     const successCount = emailResults.filter(r => r.success).length;
     const totalCount = emailResults.length;
