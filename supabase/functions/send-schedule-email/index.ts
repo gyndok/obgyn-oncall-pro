@@ -188,6 +188,10 @@ const handler = async (req: Request): Promise<Response> => {
           resendResponse: emailResponse
         });
 
+        // Add delay to respect Resend rate limit (2 requests per second)
+        // Wait 600ms between emails to be safe
+        await new Promise(resolve => setTimeout(resolve, 600));
+
       } catch (error: any) {
         console.error(`Failed to send email to ${doctor.name}:`, error);
         emailResults.push({
