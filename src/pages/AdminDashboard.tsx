@@ -90,6 +90,13 @@ const AdminDashboard = () => {
     success: boolean;
   }>>({});
 
+  // State for tracking individual schedule email sends
+  const [scheduleEmailSends, setScheduleEmailSends] = useState<Record<string, {
+    sentAt: number;
+    success: boolean;
+    sending: boolean;
+  }>>({});
+
   // Load reminder sends from localStorage on mount
   useEffect(() => {
     const savedReminderSends = localStorage.getItem('adminReminderSends');
@@ -100,12 +107,26 @@ const AdminDashboard = () => {
         console.error('Error loading reminder sends from localStorage:', error);
       }
     }
+
+    const savedScheduleEmailSends = localStorage.getItem('adminScheduleEmailSends');
+    if (savedScheduleEmailSends) {
+      try {
+        setScheduleEmailSends(JSON.parse(savedScheduleEmailSends));
+      } catch (error) {
+        console.error('Error loading schedule email sends from localStorage:', error);
+      }
+    }
   }, []);
 
   // Save reminder sends to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('adminReminderSends', JSON.stringify(reminderSends));
   }, [reminderSends]);
+
+  // Save schedule email sends to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('adminScheduleEmailSends', JSON.stringify(scheduleEmailSends));
+  }, [scheduleEmailSends]);
 
   // Check if a doctor can receive a reminder (24 hour cooldown)
   const canSendReminder = (doctorId: string) => {
@@ -793,6 +814,115 @@ const AdminDashboard = () => {
     } finally {
       setSendingEmails(false);
     }
+  };
+
+  // Send schedule email to individual doctor
+  const sendIndividualScheduleEmail = async (doctor: any) => {
+    if (!currentBlock || currentBlock.status !== 'published') {
+      toast({
+        title: "Cannot Send Email",
+        description: "Schedule must be published before sending emails",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Set sending state for this doctor
+    setScheduleEmailSends(prev => ({
+      ...prev,
+      [doctor.id]: {
+        ...prev[doctor.id],
+        sending: true
+      }
+    }));
+
+    try {
+      console.log(`Sending schedule email to ${doctor.name} (${doctor.email})...`);
+      
+      // Create a fake assignment data for just this doctor
+      const doctorAssignments = assignments.filter(a => a.doctor_id === doctor.id);
+      
+      // Create a temporary edge function call just for this doctor
+      const { error } = await supabase.functions.invoke('send-schedule-email', {
+        body: {
+          blockId: currentBlock.id,
+          customMessage: customEmailMessage.trim() || null,
+          singleDoctorId: doctor.id // Add this parameter to send to just one doctor
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to send email');
+      }
+
+      // Mark as successfully sent
+      setScheduleEmailSends(prev => ({
+        ...prev,
+        [doctor.id]: {
+          sentAt: Date.now(),
+          success: true,
+          sending: false
+        }
+      }));
+
+      toast({
+        title: "Email Sent",
+        description: `Schedule email sent successfully to ${doctor.name}`
+      });
+
+    } catch (error: any) {
+      console.error(`Error sending email to ${doctor.name}:`, error);
+      
+      // Mark as failed
+      setScheduleEmailSends(prev => ({
+        ...prev,
+        [doctor.id]: {
+          sentAt: Date.now(),
+          success: false,
+          sending: false
+        }
+      }));
+
+      toast({
+        title: "Email Failed",
+        description: `Failed to send email to ${doctor.name}: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Get button state for individual email send
+  const getEmailButtonState = (doctorId: string) => {
+    const emailSend = scheduleEmailSends[doctorId];
+    if (!emailSend) return {
+      variant: 'outline' as const,
+      text: 'Send Schedule',
+      disabled: false
+    };
+    
+    if (emailSend.sending) return {
+      variant: 'outline' as const,
+      text: 'Sending...',
+      disabled: true
+    };
+
+    const now = Date.now();
+    const hoursSinceLastSend = (now - emailSend.sentAt) / (1000 * 60 * 60);
+    
+    if (hoursSinceLastSend < 1) { // 1 hour cooldown
+      return {
+        variant: emailSend.success ? 'default' as const : 'destructive' as const,
+        text: emailSend.success ? 'Sent ✓' : 'Failed ✗',
+        disabled: true,
+        className: emailSend.success ? 'bg-green-600 hover:bg-green-700 text-white' : ''
+      };
+    }
+    
+    return {
+      variant: 'outline' as const,
+      text: 'Send Schedule',
+      disabled: false
+    };
   };
 
   // Generate AI prompt based on doctor requests and preferences
@@ -1978,12 +2108,13 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
+                     <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Status</TableHead>
                   <TableHead>Password Setup</TableHead>
                   <TableHead>Last Login</TableHead>
+                      <TableHead>Send Schedule</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -2005,10 +2136,27 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       </Badge>}
                   </TableCell>
                   <TableCell>
-                    {doctor.first_login_at ? <span className="text-sm text-muted-foreground">
-                        {format(new Date(doctor.first_login_at), 'MMM d, yyyy h:mm a')}
-                      </span> : <span className="text-sm text-muted-foreground">Never</span>}
-                  </TableCell>
+                     {doctor.first_login_at ? <span className="text-sm text-muted-foreground">
+                         {format(new Date(doctor.first_login_at), 'MMM d, yyyy h:mm a')}
+                       </span> : <span className="text-sm text-muted-foreground">Never</span>}
+                   </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const buttonState = getEmailButtonState(doctor.id);
+                            return (
+                              <Button 
+                                variant={buttonState.variant}
+                                size="sm" 
+                                onClick={() => sendIndividualScheduleEmail(doctor)}
+                                disabled={buttonState.disabled || !currentBlock || currentBlock.status !== 'published'}
+                                className={buttonState.className}
+                              >
+                                <Mail className="h-3 w-3 mr-1" />
+                                {buttonState.text}
+                              </Button>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Button variant="outline" size="sm" onClick={() => openDoctorDialog(doctor)}>

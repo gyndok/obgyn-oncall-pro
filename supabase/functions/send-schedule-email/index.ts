@@ -13,6 +13,7 @@ const corsHeaders = {
 interface ScheduleEmailRequest {
   blockId: string;
   customMessage?: string;
+  singleDoctorId?: string; // New parameter for individual sends
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -22,7 +23,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { blockId, customMessage }: ScheduleEmailRequest = await req.json();
+    const { blockId, customMessage, singleDoctorId }: ScheduleEmailRequest = await req.json();
 
     if (!blockId) {
       throw new Error('Block ID is required');
@@ -46,11 +47,18 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Get all doctors - with detailed logging
     console.log('Fetching doctors...');
-    const { data: doctors, error: doctorsError } = await supabase
+    let doctorsQuery = supabase
       .from('doctors')
       .select('*')
-      .eq('active', true)
-      .order('name');
+      .eq('active', true);
+
+    // If sending to a specific doctor, filter by that doctor ID
+    if (singleDoctorId) {
+      doctorsQuery = doctorsQuery.eq('id', singleDoctorId);
+      console.log(`Filtering for single doctor ID: ${singleDoctorId}`);
+    }
+
+    const { data: doctors, error: doctorsError } = await doctorsQuery.order('name');
 
     console.log('Doctors query result:', { 
       doctorsCount: doctors?.length || 0, 
