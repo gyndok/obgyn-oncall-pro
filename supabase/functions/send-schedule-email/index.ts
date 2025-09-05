@@ -44,14 +44,25 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (blockError) throw blockError;
 
-    // Get all doctors
+    // Get all doctors - with detailed logging
+    console.log('Fetching doctors...');
     const { data: doctors, error: doctorsError } = await supabase
       .from('doctors')
       .select('*')
       .eq('active', true)
       .order('name');
 
-    if (doctorsError) throw doctorsError;
+    console.log('Doctors query result:', { 
+      doctorsCount: doctors?.length || 0, 
+      error: doctorsError?.message || 'none',
+      firstDoctorName: doctors?.[0]?.name || 'none',
+      doctorNames: doctors?.map(d => d.name) || []
+    });
+
+    if (doctorsError) {
+      console.error('Doctors query failed:', doctorsError);
+      throw doctorsError;
+    }
 
     // Get all assignments for this block
     const { data: assignments, error: assignmentsError } = await supabase
