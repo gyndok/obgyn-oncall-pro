@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Users, Calendar as CalendarIcon, Send, Download, CheckCircle, Clock, AlertTriangle, Mail, Lock, Play, Upload, Plus, Edit, Trash2, Save, X, ChevronDown, ChevronRight, UserCheck, LogOut } from "lucide-react";
+import { Settings, Users, Calendar as CalendarIcon, Send, Download, CheckCircle, Clock, AlertTriangle, Mail, Lock, Play, Upload, Plus, Edit, Trash2, Save, X, ChevronDown, ChevronRight, UserCheck, LogOut, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -889,6 +889,16 @@ const AdminDashboard = () => {
         variant: "destructive"
       });
     }
+  };
+
+  // Reset all schedule email send states
+  const resetScheduleEmailSends = () => {
+    setScheduleEmailSends({});
+    localStorage.removeItem('adminScheduleEmailSends');
+    toast({
+      title: "Reset Complete",
+      description: "All schedule email sending status has been reset"
+    });
   };
 
   // Get button state for individual email send
@@ -2301,6 +2311,10 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     <Button onClick={sendMassEmail} disabled={!currentBlock || currentBlock.status !== 'published' || sendingEmails} className="bg-blue-600 hover:bg-blue-700 text-white">
                       <Mail className="h-4 w-4 mr-2" />
                       {sendingEmails ? "Sending..." : "Email Schedule to All Doctors"}
+                    </Button>
+                    <Button onClick={resetScheduleEmailSends} variant="outline" size="sm" className="text-gray-600 hover:bg-gray-50">
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Reset Email Status
                     </Button>
                   </div>
 
