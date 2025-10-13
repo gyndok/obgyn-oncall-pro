@@ -89,6 +89,8 @@ CRITICAL CONSTRAINTS:
 - Each doctor gets exactly one weekend bundle (Fri+Sat+Sun)
 - Each doctor gets exactly 4 weekdays (Mon-Thu)
 - LeBlanc never gets Tuesday
+- If Johnson is on weekend call (Fri+Sat+Sun), Clinger must be assigned the Monday immediately after
+- If Clinger is on weekend call (Fri+Sat+Sun), Johnson must be assigned the Monday immediately after
 - Use exact doctor names: Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson
 - Use abbreviated weekday names: Mon, Tue, Wed, Thu, Fri, Sat, Sun
 - Dates must be in YYYY-MM-DD format
