@@ -44,6 +44,8 @@ serve(async (req) => {
         throw new Error('Google Calendar token expired. Please re-authorize access.');
       }
 
+      console.log('Attempting to refresh Google Calendar token...');
+      
       const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
@@ -61,6 +63,8 @@ serve(async (req) => {
         const tokens = await refreshResponse.json();
         accessToken = tokens.access_token;
         
+        console.log('Successfully refreshed Google Calendar token');
+        
         // Update stored token
         await supabase
           .from('doctors')
@@ -70,7 +74,9 @@ serve(async (req) => {
           })
           .eq('auth_user_id', userId);
       } else {
-        throw new Error('Failed to refresh Google Calendar token. Please re-authorize access.');
+        const errorData = await refreshResponse.json();
+        console.error('Failed to refresh token. Google response:', errorData);
+        throw new Error(`Failed to refresh Google Calendar token: ${errorData.error || 'Please re-authorize access.'}`);
       }
     }
 
