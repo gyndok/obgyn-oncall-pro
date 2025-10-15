@@ -20,6 +20,26 @@ export const GoogleCalendarConnect: React.FC<GoogleCalendarConnectProps> = ({ on
 
   useEffect(() => {
     checkConnectionStatus();
+    
+    // Check if we returned from a failed OAuth attempt
+    const oauthAttempt = sessionStorage.getItem('google_oauth_attempt');
+    if (oauthAttempt) {
+      const attemptTime = parseInt(oauthAttempt);
+      const now = Date.now();
+      
+      // If we returned within 10 seconds and have no code, it likely failed
+      if (now - attemptTime < 10000) {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (!urlParams.get('code')) {
+          toast.error(
+            'Google OAuth failed. Please ensure redirect URI is configured in Google Cloud Console:\n' +
+            window.location.origin + window.location.pathname,
+            { duration: 10000 }
+          );
+        }
+      }
+      sessionStorage.removeItem('google_oauth_attempt');
+    }
   }, [user]);
 
   useEffect(() => {
@@ -73,15 +93,22 @@ export const GoogleCalendarConnect: React.FC<GoogleCalendarConnectProps> = ({ on
   const handleConnect = async () => {
     if (!user) {
       console.error('No user found');
+      toast.error('Please log in first');
       return;
     }
 
     console.log('Starting Google Calendar connection...');
     setIsConnecting(true);
     
+    // Show a toast to inform user what's happening
+    toast.info('Redirecting to Google for authorization...', {
+      duration: 3000
+    });
+    
     try {
       const redirectUri = window.location.origin + window.location.pathname;
       console.log('Redirect URI:', redirectUri);
+      console.log('⚠️ IMPORTANT: Make sure this redirect URI is configured in Google Cloud Console');
       
       const { data, error } = await supabase.functions.invoke('google-calendar-auth', {
         body: {
@@ -100,8 +127,14 @@ export const GoogleCalendarConnect: React.FC<GoogleCalendarConnectProps> = ({ on
 
       if (data?.authUrl) {
         console.log('Redirecting to Google OAuth:', data.authUrl);
-        // Redirect to Google OAuth
-        window.location.href = data.authUrl;
+        
+        // Store that we're attempting connection
+        sessionStorage.setItem('google_oauth_attempt', Date.now().toString());
+        
+        // Redirect to Google OAuth - page will go blank while redirecting
+        setTimeout(() => {
+          window.location.href = data.authUrl;
+        }, 500);
       } else {
         console.error('No authUrl in response:', data);
         throw new Error('Failed to get authorization URL');
