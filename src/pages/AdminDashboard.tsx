@@ -614,15 +614,34 @@ const AdminDashboard = () => {
       }
     } catch (error) {
       console.error('Error publishing to calendar:', error);
-      setPublishStatus({
-        type: 'error',
-        message: `Failed to publish: ${error.message}`
-      });
-      toast({
-        title: "Error",
-        description: "Failed to publish schedule",
-        variant: "destructive"
-      });
+      
+      // Check if this is a token refresh error
+      const errorMessage = error.message || '';
+      const isTokenError = errorMessage.includes('invalid_grant') || 
+                          errorMessage.includes('refresh') || 
+                          errorMessage.includes('token');
+      
+      if (isTokenError) {
+        setPublishStatus({
+          type: 'error',
+          message: 'Google Calendar token expired. Please disconnect and reconnect your Google Calendar below.'
+        });
+        toast({
+          title: "Google Calendar Token Expired",
+          description: "Please disconnect and reconnect your Google Calendar to continue.",
+          variant: "destructive"
+        });
+      } else {
+        setPublishStatus({
+          type: 'error',
+          message: `Failed to publish: ${errorMessage}`
+        });
+        toast({
+          title: "Error",
+          description: "Failed to publish schedule",
+          variant: "destructive"
+        });
+      }
     } finally {
       setPublishing(false);
     }

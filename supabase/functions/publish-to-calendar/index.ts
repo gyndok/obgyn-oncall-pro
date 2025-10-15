@@ -76,7 +76,7 @@ serve(async (req) => {
       } else {
         const errorData = await refreshResponse.json();
         console.error('Failed to refresh token. Google response:', errorData);
-        throw new Error(`Failed to refresh Google Calendar token: ${errorData.error || 'Please re-authorize access.'}`);
+        throw new Error(`Google Calendar token refresh failed (${errorData.error}). Please disconnect and reconnect your Google Calendar.`);
       }
     }
 
