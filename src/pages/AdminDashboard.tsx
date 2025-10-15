@@ -1738,7 +1738,6 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
             <TabsTrigger value="doctors">Doctors</TabsTrigger>
             <TabsTrigger value="publish">Publish</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -2058,22 +2057,8 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                   </div>
                 </div>
 
-                {/* AI Prompt Preview */}
-                <Card className="card-stats">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-xl">
-                      <Settings className="h-5 w-5 text-primary" />
-                      AI Scheduling Prompt
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="bg-muted/50 rounded-lg p-4 max-h-96 overflow-y-auto">
-                      <pre className="text-sm whitespace-pre-wrap font-mono text-muted-foreground">
-                        {generateAIPrompt()}
-                      </pre>
-                    </div>
-                  </CardContent>
-                </Card>
+                {/* AI Prompt Editor */}
+                <AIPromptEditor />
 
                 {assignments.length > 0 ? <ScheduleVisualization assignments={assignments} block={currentBlock} /> : <Card className="shadow-soft">
                     <CardContent className="py-16 text-center">
@@ -2234,11 +2219,6 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </TabsContent>
-
-          {/* Settings Tab */}
-          <TabsContent value="settings" className="space-y-6">
-            <AIPromptEditor />
           </TabsContent>
 
           {/* Publish Tab */}
