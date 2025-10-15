@@ -27,6 +27,18 @@ export const GoogleCalendarConnect: React.FC<GoogleCalendarConnectProps> = ({ on
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const state = urlParams.get('state');
+    const error = urlParams.get('error');
+
+    if (error) {
+      console.error('OAuth error:', error);
+      toast.error(`Google Calendar connection failed: ${error}`);
+      
+      // Clean up URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('error');
+      window.history.replaceState({}, document.title, url.toString());
+      return;
+    }
 
     if (code && state === user?.id) {
       handleOAuthCallback(code);
