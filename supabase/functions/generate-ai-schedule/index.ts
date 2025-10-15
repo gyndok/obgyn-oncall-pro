@@ -89,8 +89,13 @@ CRITICAL CONSTRAINTS:
 - Each doctor gets exactly one weekend bundle (Fri+Sat+Sun)
 - Each doctor gets exactly 4 weekdays (Mon-Thu)
 - LeBlanc never gets Tuesday
-- If Johnson is on weekend call (Fri+Sat+Sun), Clinger must be assigned the Monday immediately after
-- If Clinger is on weekend call (Fri+Sat+Sun), Johnson must be assigned the Monday immediately after
+
+JOHNSON-CLINGER MONDAY RULE (ABSOLUTE):
+- Dr. Clinger ALWAYS takes the Monday after Johnson's weekend (Fri+Sat+Sun)
+- Dr. Johnson ALWAYS takes the Monday after Clinger's weekend (Fri+Sat+Sun)
+- BLOCKING RULE: If Johnson has requested off a Monday, then Clinger CANNOT have the weekend (Fri+Sat+Sun) immediately before that Monday, even if Clinger requested that weekend
+- BLOCKING RULE: If Clinger has requested off a Monday, then Johnson CANNOT have the weekend (Fri+Sat+Sun) immediately before that Monday, even if Johnson requested that weekend
+
 - Use exact doctor names: Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson
 - Use abbreviated weekday names: Mon, Tue, Wed, Thu, Fri, Sat, Sun
 - Dates must be in YYYY-MM-DD format
