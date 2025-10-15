@@ -19,6 +19,7 @@ import { toast } from "@/hooks/use-toast";
 import ScheduleVisualization from "@/components/ScheduleVisualization";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { GoogleCalendarConnect } from "@/components/GoogleCalendarConnect";
+import { AIPromptEditor } from "@/components/AIPromptEditor";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, addWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -1737,6 +1738,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
             <TabsTrigger value="doctors">Doctors</TabsTrigger>
             <TabsTrigger value="publish">Publish</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -2232,6 +2234,11 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-6">
+            <AIPromptEditor />
           </TabsContent>
 
           {/* Publish Tab */}

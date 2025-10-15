@@ -1,7 +1,10 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const deepseekApiKey = Deno.env.get('DEEPSEEK_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,6 +49,22 @@ serve(async (req) => {
       doctorNames: doctors?.map(d => d.name) || []
     });
 
+    // Fetch the AI prompt from database
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: settingsData, error: settingsError } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'ai_scheduling_prompt')
+      .single();
+
+    if (settingsError) {
+      console.error('Failed to fetch AI prompt from database:', settingsError);
+      throw new Error('Failed to fetch AI scheduling prompt configuration');
+    }
+
+    const systemPrompt = settingsData.value;
+    console.log('📝 Using AI prompt from database (length:', systemPrompt.length, 'chars)');
+
     console.log('📝 Sending AI scheduling prompt to DeepSeek...');
     console.log('Block start date:', blockStartDate);
     console.log('Number of doctors:', doctors.length);
@@ -61,45 +80,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert medical scheduling AI. You must respond with a valid JSON object containing a complete 7-week call schedule.
-
-RESPONSE FORMAT (REQUIRED):
-{
-  "schedule": [
-    {
-      "date": "2025-11-03",
-      "doctor_name": "Klein",
-      "is_weekend": false,
-      "weekday_name": "Mon",
-      "week_index": 1
-    },
-    ...
-  ],
-  "summary": {
-    "total_assignments": 49,
-    "weekend_assignments": 21,
-    "weekday_assignments": 28,
-    "violations": []
-  }
-}
-
-CRITICAL CONSTRAINTS:
-- Generate exactly 49 assignments (7 weeks × 7 days)
-- Week_index must be 1-7 (Week 1 = Nov 3-9, Week 2 = Nov 10-16, etc.)
-- Each doctor gets exactly one weekend bundle (Fri+Sat+Sun)
-- Each doctor gets exactly 4 weekdays (Mon-Thu)
-- LeBlanc never gets Tuesday
-
-JOHNSON-CLINGER MONDAY RULE (ABSOLUTE):
-- Dr. Clinger ALWAYS takes the Monday after Johnson's weekend (Fri+Sat+Sun)
-- Dr. Johnson ALWAYS takes the Monday after Clinger's weekend (Fri+Sat+Sun)
-- BLOCKING RULE: If Johnson has requested off a Monday, then Clinger CANNOT have the weekend (Fri+Sat+Sun) immediately before that Monday, even if Clinger requested that weekend
-- BLOCKING RULE: If Clinger has requested off a Monday, then Johnson CANNOT have the weekend (Fri+Sat+Sun) immediately before that Monday, even if Johnson requested that weekend
-
-- Use exact doctor names: Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson
-- Use abbreviated weekday names: Mon, Tue, Wed, Thu, Fri, Sat, Sun
-- Dates must be in YYYY-MM-DD format
-- Respond ONLY with valid JSON, no other text`
+            content: systemPrompt
           },
           {
             role: 'user',
