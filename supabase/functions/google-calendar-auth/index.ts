@@ -24,6 +24,9 @@ serve(async (req) => {
     console.log('Google Calendar Auth request:', { action, userId, hasCode: !!code });
 
     if (action === 'getAuthUrl') {
+      console.log('📍 Redirect URI received from frontend:', redirectUri);
+      console.log('🔑 Using Client ID:', googleClientId.substring(0, 20) + '...');
+      
       // Generate OAuth URL for user to authorize
       const scopes = [
         'https://www.googleapis.com/auth/calendar',
@@ -38,6 +41,9 @@ serve(async (req) => {
       authUrl.searchParams.append('access_type', 'offline');
       authUrl.searchParams.append('prompt', 'consent');
       authUrl.searchParams.append('state', userId); // Pass user ID in state
+
+      console.log('🔗 Full auth URL being generated:', authUrl.toString());
+      console.log('⚠️  VERIFY THIS REDIRECT URI IN GOOGLE CLOUD CONSOLE ⚠️');
 
       return new Response(JSON.stringify({ 
         authUrl: authUrl.toString(),
