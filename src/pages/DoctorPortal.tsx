@@ -473,13 +473,20 @@ const DoctorPortal = () => {
                       {/* 7x7 Date Grid */}
                       <div className="grid grid-cols-7 gap-1">
                         {(() => {
-                        const startMonday = parseLocalDate(currentBlock.start_monday_date);
+                        // Parse the start date and find the actual Monday
+                        const startDate = parseLocalDate(currentBlock.start_monday_date);
+                        // Get the day of week (0=Sunday, 1=Monday, etc.)
+                        const dayOfWeek = startDate.getDay();
+                        // Calculate how many days to subtract to get to Monday
+                        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                        // Get the actual Monday
+                        const actualMonday = addDays(startDate, -daysToMonday);
                         const dates = [];
 
                         // Generate all 49 dates (7 weeks x 7 days)
                         for (let week = 0; week < 7; week++) {
                           for (let day = 0; day < 7; day++) {
-                            const currentDate = addDays(addWeeks(startMonday, week), day);
+                            const currentDate = addDays(addWeeks(actualMonday, week), day);
                             const dateString = format(currentDate, 'yyyy-MM-dd');
                             const isSelected = selectedUnavailableDates.some(selectedDate => format(selectedDate, 'yyyy-MM-dd') === dateString);
                             const holidayInfo = getHolidayInfo(currentDate);
