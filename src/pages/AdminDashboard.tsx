@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Users, Calendar as CalendarIcon, Send, Download, CheckCircle, Clock, AlertTriangle, Mail, Lock, Play, Upload, Plus, Edit, Trash2, Save, X, ChevronDown, ChevronRight, UserCheck, LogOut, RotateCcw } from "lucide-react";
+import { Settings, Users, Calendar as CalendarIcon, Send, Download, CheckCircle, Clock, AlertTriangle, Mail, Lock, Play, Upload, Plus, Edit, Trash2, Save, X, ChevronDown, ChevronRight, UserCheck, LogOut, RotateCcw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -332,11 +332,14 @@ const AdminDashboard = () => {
       setSaving(false);
     }
   };
+  // State for Lovable AI generation
+  const [generatingWithLovable, setGeneratingWithLovable] = useState(false);
+
   const generateSchedule = async () => {
     if (!currentBlock) return;
     setSaving(true);
     try {
-      console.log('🤖 Generating AI-powered schedule...');
+      console.log('🤖 Generating AI-powered schedule with DeepSeek...');
 
       // Generate the AI prompt with all doctor preferences
       const aiPrompt = generateAIPrompt();
@@ -402,6 +405,84 @@ const AdminDashboard = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const generateScheduleWithLovable = async () => {
+    if (!currentBlock) return;
+    setGeneratingWithLovable(true);
+    try {
+      console.log('✨ Generating AI-powered schedule with Lovable AI...');
+
+      // Generate the AI prompt with all doctor preferences
+      const aiPrompt = generateAIPrompt();
+
+      // Prepare doctor data for the AI function
+      const doctorData = doctors.map(doctor => ({
+        id: doctor.id,
+        name: doctor.name
+      }));
+
+      // Call the Lovable AI scheduling edge function
+      const response = await supabase.functions.invoke('generate-ai-schedule-lovable', {
+        body: {
+          prompt: aiPrompt,
+          blockStartDate: currentBlock.start_monday_date,
+          doctors: doctorData
+        }
+      });
+      
+      if (response.error) {
+        console.error('Lovable AI scheduling error:', response.error);
+        throw new Error(response.error.message || 'Failed to generate AI schedule');
+      }
+      
+      const {
+        assignments: aiAssignments,
+        summary
+      } = response.data;
+      
+      if (!aiAssignments || aiAssignments.length === 0) {
+        throw new Error('AI returned no assignments');
+      }
+      
+      console.log(`📋 Lovable AI generated ${aiAssignments.length} assignments`);
+      if (summary) {
+        console.log('📊 Schedule summary:', summary);
+      }
+
+      // Add block_id to each assignment
+      const assignmentsWithBlockId = aiAssignments.map((assignment: any) => ({
+        ...assignment,
+        block_id: currentBlock.id
+      }));
+
+      // Clear existing assignments for this block
+      const {
+        error: deleteError
+      } = await supabase.from('assignments').delete().eq('block_id', currentBlock.id);
+      if (deleteError) throw deleteError;
+
+      // Insert new AI-generated assignments
+      const {
+        error: insertError
+      } = await supabase.from('assignments').insert(assignmentsWithBlockId);
+      if (insertError) throw insertError;
+      
+      toast({
+        title: "AI Schedule Generated Successfully! ✨",
+        description: `Created ${aiAssignments.length} assignments using Lovable AI (Gemini) with doctor preferences`
+      });
+      fetchData();
+    } catch (error: any) {
+      console.error('Error generating AI schedule with Lovable:', error);
+      toast({
+        title: "Lovable AI Schedule Generation Failed",
+        description: error.message || "Failed to generate schedule. Check console for details.",
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingWithLovable(false);
     }
   };
   
@@ -2058,9 +2139,17 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={generateSchedule} disabled={saving} className="bg-gradient-primary hover:opacity-90">
+                    <Button 
+                      onClick={generateScheduleWithLovable} 
+                      disabled={generatingWithLovable || saving} 
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {generatingWithLovable ? "Generating..." : "Generate with Lovable AI"}
+                    </Button>
+                    <Button onClick={generateSchedule} disabled={saving || generatingWithLovable} variant="outline">
                       <Play className="h-4 w-4 mr-2" />
-                       {saving ? "Generating..." : "Generate AI Schedule"}
+                       {saving ? "Generating..." : "Generate (DeepSeek)"}
                     </Button>
                     <Button 
                       variant="outline" 
@@ -2099,11 +2188,22 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                        <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
                        <h3 className="text-xl font-semibold mb-2">No Schedule Generated</h3>
                         <p className="text-muted-foreground mb-4">
-                          Generate an AI-powered schedule using ChatGPT to assign doctors optimally
+                          Generate an AI-powered schedule to assign doctors optimally
                         </p>
-                       <Button onClick={generateSchedule} disabled={saving}>
-                         {saving ? "Generating..." : "Generate AI Schedule"}
-                       </Button>
+                        <div className="flex gap-2 justify-center">
+                          <Button 
+                            onClick={generateScheduleWithLovable} 
+                            disabled={generatingWithLovable || saving}
+                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                          >
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            {generatingWithLovable ? "Generating..." : "Generate with Lovable AI"}
+                          </Button>
+                          <Button onClick={generateSchedule} disabled={saving || generatingWithLovable} variant="outline">
+                            <Play className="h-4 w-4 mr-2" />
+                            {saving ? "Generating..." : "Generate (DeepSeek)"}
+                          </Button>
+                        </div>
                      </CardContent>
                    </Card>}
                </> : <Card className="shadow-soft">
