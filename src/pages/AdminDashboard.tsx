@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Settings, Users, Calendar as CalendarIcon, Send, Download, CheckCircle, Clock, AlertTriangle, Mail, Lock, Play, Upload, Plus, Edit, Trash2, Save, X, ChevronDown, ChevronRight, UserCheck, LogOut, RotateCcw, Sparkles } from "lucide-react";
+import { Settings, Users, Calendar as CalendarIcon, Send, Download, CheckCircle, Clock, AlertTriangle, Mail, Lock, Play, Upload, Plus, Edit, Trash2, Save, X, ChevronDown, ChevronRight, UserCheck, LogOut, RotateCcw, Sparkles, FileDown } from "lucide-react";
+import { downloadIcsFile } from "@/lib/icsExport";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -2427,9 +2428,23 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       {cleaningUp ? "Cleaning..." : "Clean Old Data"}
                     </Button>
                     
+                    <Button 
+                      onClick={() => {
+                        if (currentBlock && assignments.length > 0) {
+                          downloadIcsFile(assignments, doctors, currentBlock.start_monday_date, currentBlock.end_sunday_date);
+                          toast({ title: "ICS Downloaded", description: "Import this file into your calendar app." });
+                        }
+                      }} 
+                      disabled={!currentBlock || assignments.length === 0}
+                      variant="outline"
+                    >
+                      <FileDown className="h-4 w-4 mr-2" />
+                      Download ICS
+                    </Button>
+                    
                     <Button onClick={publishToCalendar} disabled={!currentBlock || assignments.length === 0 || publishing} className="bg-gradient-primary hover:opacity-90">
                       <Upload className="h-4 w-4 mr-2" />
-                      {publishing ? "Publishing..." : "Publish to Calendar"}
+                      {publishing ? "Publishing..." : "Publish to Google Calendar"}
                     </Button>
                     <Button variant="outline" disabled={!currentBlock || currentBlock.status !== 'published' || unpublishing} onClick={unpublishSchedule}>
                       {unpublishing ? "Unpublishing..." : "Unpublish Schedule"}
