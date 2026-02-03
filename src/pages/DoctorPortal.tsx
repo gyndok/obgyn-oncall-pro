@@ -47,8 +47,13 @@ const getHolidays = (year: number) => {
   });
 
   // Memorial Day (last Monday in May)
-  const memorialDay = new Date(year, 4, 31);
-  memorialDay.setDate(31 - memorialDay.getDay());
+  const memorialDay = new Date(year, 4, 31); // Start at May 31
+  const dayOfWeek = memorialDay.getDay();
+  // If May 31 is a Monday (0), use it; otherwise go back to the previous Monday
+  // dayOfWeek: 0=Sun, 1=Mon, 2=Tue, etc.
+  // We need to find how many days back to get to Monday (1)
+  const daysToSubtract = dayOfWeek === 1 ? 0 : (dayOfWeek === 0 ? 6 : dayOfWeek - 1);
+  memorialDay.setDate(31 - daysToSubtract);
   holidays.push({
     date: memorialDay,
     name: "Memorial Day"
