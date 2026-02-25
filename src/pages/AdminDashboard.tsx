@@ -274,7 +274,9 @@ const AdminDashboard = () => {
     setSaving(true);
     try {
       const startDate = new Date(newBlockStartDate);
-      const endDate = addDays(addWeeks(startDate, 7), -1); // 7 weeks, ending on Sunday
+      const activeDoctorCount = doctors.filter(d => d.active).length;
+      const weekCount = activeDoctorCount || 7; // Default to 7 if no doctors
+      const endDate = addDays(addWeeks(startDate, weekCount), -1); // N weeks, ending on Sunday
 
       const {
         error
@@ -1042,19 +1044,34 @@ const AdminDashboard = () => {
     if (!currentBlock) return "No active block available.";
     const blockStart = parseLocalDate(currentBlock.start_monday_date);
     const blockEnd = parseLocalDate(currentBlock.end_sunday_date);
+    
+    const activeDoctors = doctors.filter(d => d.active);
+    const doctorCount = activeDoctors.length;
+    const weekCount = doctorCount;
+    const totalDays = weekCount * 7;
+    const weekdaysPerDoctor = weekCount - 3; // Each doctor gets (N-3) weekdays (total weekdays = N*4, each doctor gets 4... actually N weeks * 4 weekdays = 4N, divided by N doctors = 4)
+    // Actually: N weeks, 4 weekdays per week = 4N weekdays total, N doctors each get 1 weekend (3 days) leaving 4N weekdays / N = 4 per doctor
+    const weekdayCount = 4; // Always 4 weekdays per doctor regardless of rotation size
+    
+    const doctorNames = activeDoctors.map(d => {
+      const name = d.name.replace('Dr. ', '');
+      const parts = name.split(' ');
+      return parts[parts.length - 1]; // Last name
+    });
+    const doctorNamesStr = doctorNames.join(', ');
 
     // Get submitted requests
     const submittedRequests = doctorRequests.filter(req => req.status === 'submitted');
-    let prompt = `**Role:** You are a medical call-scheduling AI. Generate an optimal 7-week on-call schedule for 7 doctors.
+    let prompt = `**Role:** You are a medical call-scheduling AI. Generate an optimal ${weekCount}-week on-call schedule for ${doctorCount} doctors.
 
 **Schedule Period**
 
 * Start: ${format(blockStart, 'yyyy-MM-dd')} (a Monday)
-* Duration: 7 weeks (Mon–Sun weeks; 49 consecutive days)
+* Duration: ${weekCount} weeks (Mon–Sun weeks; ${totalDays} consecutive days)
 
-**Doctors (exactly 7)**
+**Doctors (exactly ${doctorCount})**
 
-* Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson
+* ${doctorNamesStr}
 
   * Standing constraint: **LeBlanc may never be scheduled on a Tuesday.**
 
@@ -1066,21 +1083,21 @@ const AdminDashboard = () => {
 
    * That doctor **cannot** be assigned the **Thursday immediately before** it.
    * That doctor **cannot** be assigned the **Monday immediately after** it.
-4. **Weekday totals:** Across the 7 weeks, each doctor is assigned **exactly 4 weekdays** from **Monday–Thursday** (no Fri/Sat/Sun count toward this).
+4. **Weekday totals:** Across the ${weekCount} weeks, each doctor is assigned **exactly ${weekdayCount} weekdays** from **Monday–Thursday** (no Fri/Sat/Sun count toward this).
 5. **Max one weekday per week per doctor:** For every doctor, in each week, at most **one** of Mon–Thu may be assigned to that doctor.
 6. **Doctor-specific rule:** **LeBlanc** is assigned **0 Tuesdays** across the entire block.
 7. **Time-off / Unavailability:** Any date listed as unavailable for a doctor is a **hard exclude** for that doctor.
-8. **Date bounds:** Do not assign outside the 49-day window.
+8. **Date bounds:** Do not assign outside the ${totalDays}-day window.
 
 **Soft Constraints (optimize these after satisfying all hard constraints)**
 A) **Honor preferred weekend(s):** If a doctor listed preferred weekend bundles, assign them when feasible.
-B) **Fairness / Smoothness:** Spread each doctor's 4 Mon–Thu days across the block to avoid front-loading or back-loading (aim for at least one weekday in early weeks and one in late weeks when feasible).
+B) **Fairness / Smoothness:** Spread each doctor's ${weekdayCount} Mon–Thu days across the block to avoid front-loading or back-loading.
 C) **Even distribution per week:** Avoid stacking many different doctors' weekdays into the same one or two weeks if alternatives exist.
 
 **Optimization Objective (lexicographic preference)**
 
 1. Minimize the number of **preferred-weekend violations** (doctor has a preferred weekend but receives a different one).
-2. Minimize **weekday distribution imbalance** per doctor across the 7 weeks (avoid clustering all 4 weekdays into the same small window).
+2. Minimize **weekday distribution imbalance** per doctor across the ${weekCount} weeks.
 3. Minimize minor aesthetic issues (e.g., avoid same doctor on back-to-back weekdays across week boundaries when alternatives exist).
 
 **Input You Will Receive**
@@ -1142,7 +1159,7 @@ Provide both human-readable and machine-readable outputs.
 
 2. **Per-doctor summary:**
 
-   * {Doctor}: Weekend = Week # (Fri/Sat/Sun dates), Weekdays = [Week#/Day, …] (total must equal 4)
+   * {Doctor}: Weekend = Week # (Fri/Sat/Sun dates), Weekdays = [Week#/Day, …] (total must equal ${weekdayCount})
 
 3. **JSON payload (strict schema):**
 
@@ -1153,11 +1170,11 @@ Provide both human-readable and machine-readable outputs.
     "end_sunday": "${format(blockEnd, 'yyyy-MM-dd')}"
   },
   "assignments": [
-    {"date": "YYYY-MM-DD", "weekday": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "doctor": "Klein|LeBlanc|Johnson|Kenney|LaBerge|Clinger|Demerson", "is_weekend": true|false, "week_index": 1}
-    // 49 records total
+    {"date": "YYYY-MM-DD", "weekday": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "doctor": "${doctorNames.join('|')}", "is_weekend": true|false, "week_index": 1}
+    // ${totalDays} records total
   ],
   "doctor_summaries": [
-    {"doctor": "Klein", "weekend_week_index": 3, "weekend_dates": ["YYYY-MM-DD","YYYY-MM-DD","YYYY-MM-DD"], "weekday_dates": ["YYYY-MM-DD", "YYYY-MM-DD", "YYYY-MM-DD", "YYYY-MM-DD"]}
+    {"doctor": "${doctorNames[0] || 'Name'}", "weekend_week_index": 3, "weekend_dates": ["YYYY-MM-DD","YYYY-MM-DD","YYYY-MM-DD"], "weekday_dates": ["YYYY-MM-DD", "YYYY-MM-DD", "YYYY-MM-DD", "YYYY-MM-DD"]}
     // one per doctor
   ],
   "validation": {
@@ -1170,20 +1187,20 @@ Provide both human-readable and machine-readable outputs.
 **Validator (run before returning output)**
 Confirm all of the following are true; otherwise set \`hard_constraints_passed=false\` and list each violation in \`errors\`:
 
-* Every date in the 49-day range is assigned exactly once.
+* Every date in the ${totalDays}-day range is assigned exactly once.
 * For each doctor:
 
   * Exactly **one** Fri+Sat+Sun bundle (same week).
   * **Zero** assignment on the Thu immediately before their weekend.
   * **Zero** assignment on the Mon immediately after their weekend.
-  * Exactly **4** total assignments among Mon–Thu across the full block.
+  * Exactly **${weekdayCount}** total assignments among Mon–Thu across the full block.
   * In each week, **≤1** assignment among Mon–Thu.
 * For LeBlanc: **0** Tuesday assignments.
 * No assignment occurs on a date marked unavailable for that doctor.
 
 **Tie-Breakers (if multiple optimal solutions)**
 
-1. Prefer giving each doctor one weekday in the first 3 weeks **and** one weekday in the last 3 weeks when possible.
+1. Prefer giving each doctor one weekday in the first half and one in the last half of the block when possible.
 2. Prefer distributing Tuesday assignments evenly among the doctors who can take Tuesday (never LeBlanc).
 3. Prefer that a doctor's weekend be as close as possible to their preferred weekend if an exact match isn't feasible.
 4. If still tied, choose the lexicographically smallest schedule by (week, day, doctor name).
@@ -1191,13 +1208,13 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
 **Failure / Infeasibility Behavior**
 
 * If infeasible under the hard constraints, do **not** relax them.
-* Return an **Infeasibility Report** listing the minimal conflicting elements (e.g., too many Tuesday unavailabilities combined with the LeBlanc Tuesday ban, dense time-off near all weekends). Include the smallest set of **soft** preference relaxations that would restore feasibility (never relax hard rules).
+* Return an **Infeasibility Report** listing the minimal conflicting elements.
 
 **Formatting Notes**
 
 * Use the exact doctor names above in all outputs.
 * Use ISO dates (YYYY-MM-DD).
-* Week indices are 1–7 where Week 1 is the start week.`;
+* Week indices are 1–${weekCount} where Week 1 is the start week.`;
     return prompt;
   };
   const startEditingDates = () => {
@@ -1222,8 +1239,10 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
       return;
     }
 
-    // Calculate end date as 7 weeks from start date (49 days - 1)
-    const calculatedEndDate = addDays(addWeeks(editStartDate, 7), -1);
+    // Calculate end date dynamically based on active doctor count
+    const activeDoctorCount = doctors.filter(d => d.active).length;
+    const weekCount = activeDoctorCount || 7;
+    const calculatedEndDate = addDays(addWeeks(editStartDate, weekCount), -1);
     setSaving(true);
     try {
       const {
@@ -1806,7 +1825,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
               <DialogHeader>
                 <DialogTitle>Create New Call Block</DialogTitle>
                 <DialogDescription>
-                  Set up a new 7-week call block starting on a Monday
+                  Set up a new {doctors.filter(d => d.active).length || 7}-week call block starting on a Monday
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
@@ -2092,8 +2111,8 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">End Date</Label>
                       {!isEditingDates ? <p className="text-lg font-semibold">{format(parseLocalDate(currentBlock.end_sunday_date), 'MMM d, yyyy')}</p> : <p className="text-lg font-semibold text-muted-foreground mt-1">
-                          {editStartDate ? format(addDays(addWeeks(editStartDate, 7), -1), 'MMM d, yyyy') : 'Auto-calculated'}
-                          <span className="block text-sm font-normal">Automatically calculated as 7 weeks from start date</span>
+                          {editStartDate ? format(addDays(addWeeks(editStartDate, doctors.filter(d => d.active).length || 7), -1), 'MMM d, yyyy') : 'Auto-calculated'}
+                          <span className="block text-sm font-normal">Automatically calculated as {doctors.filter(d => d.active).length || 7} weeks from start date</span>
                         </p>}
                     </div>
                     <div>
@@ -2538,7 +2557,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
             <div>
               <Label className="text-base font-medium">Preferred Weekends</Label>
               <div className="grid grid-cols-2 gap-2 mt-2">
-                {[1, 2, 3, 4, 5, 6, 7].map(weekNum => {
+                {Array.from({length: doctors.filter(d => d.active).length || 7}, (_, i) => i + 1).map(weekNum => {
                 const isSelected = editRequestForm.preferred_weekends.includes(weekNum);
                 const weekEndDates = currentBlock ? (() => {
                   const startDate = parseLocalDate(currentBlock.start_monday_date);
