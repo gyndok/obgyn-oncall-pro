@@ -1,0 +1,1 @@
+UPDATE public.doctors SET active = false WHERE name = 'Lilliam Clinger';
