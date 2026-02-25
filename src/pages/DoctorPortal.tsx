@@ -197,13 +197,18 @@ const DoctorPortal = () => {
           const block = blocks[0];
           setCurrentBlock(block);
 
-          // Generate weekend options for the 7-week block
+          // Calculate week count dynamically from block dates
           const startMonday = parseLocalDate(block.start_monday_date);
+          const endSunday = parseLocalDate(block.end_sunday_date);
+          const blockDays = Math.round((endSunday.getTime() - startMonday.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          const weekCount = Math.round(blockDays / 7);
+          
+          // Generate weekend options for the N-week block
           const weekendOptions = [];
-          for (let week = 0; week < 7; week++) {
+          for (let week = 0; week < weekCount; week++) {
             const weekStart = addWeeks(startMonday, week);
-            const friday = addDays(weekStart, 4); // Friday is 4 days after Monday
-            const sunday = addDays(weekStart, 6); // Sunday is 6 days after Monday
+            const friday = addDays(weekStart, 4);
+            const sunday = addDays(weekStart, 6);
 
             weekendOptions.push({
               id: week + 1,
@@ -488,8 +493,11 @@ const DoctorPortal = () => {
                         const actualMonday = addDays(startDate, -daysToMonday);
                         const dates = [];
 
-                        // Generate all 49 dates (7 weeks x 7 days)
-                        for (let week = 0; week < 7; week++) {
+                        // Generate dates dynamically based on block dates
+                        const blockEndDate = parseLocalDate(currentBlock.end_sunday_date);
+                        const blockDays = Math.round((blockEndDate.getTime() - actualMonday.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                        const weekCount = Math.round(blockDays / 7);
+                        for (let week = 0; week < weekCount; week++) {
                           for (let day = 0; day < 7; day++) {
                             const currentDate = addDays(addWeeks(actualMonday, week), day);
                             const dateString = format(currentDate, 'yyyy-MM-dd');
