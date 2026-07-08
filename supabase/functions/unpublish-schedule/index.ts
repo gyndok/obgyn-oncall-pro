@@ -15,7 +15,7 @@ serve(async (req) => {
   try {
     const authedUser = await getAuthenticatedUser(req);
     if (!authedUser) return unauthorized();
-    if (!isAdmin(authedUser)) return forbidden();
+    if (!(await isAdmin(authedUser))) return forbidden();
     const userId = authedUser.id;
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
