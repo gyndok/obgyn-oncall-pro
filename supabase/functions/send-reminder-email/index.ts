@@ -23,7 +23,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const authedUser = await getAuthenticatedUser(req);
     if (!authedUser) return unauthorized();
-    if (!isAdmin(authedUser)) return forbidden();
+    if (!(await isAdmin(authedUser))) return forbidden();
 
     const { doctorName, doctorEmail, blockTitle, submissionDeadline, doctorPortalUrl }: ReminderEmailRequest = await req.json();
 

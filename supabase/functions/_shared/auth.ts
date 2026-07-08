@@ -1,9 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.1';
 
-// Single source of truth for who is an administrator. Keep in sync with the
-// RLS policies and the frontend admin check (src/lib/admin.ts).
-export const ADMIN_EMAIL = 'gyndok@yahoo.com';
-
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -14,10 +10,10 @@ export interface AuthedUser {
   email?: string;
 }
 
-// Resolve the caller from the request's Authorization bearer token. Returns
-// null when no valid user can be resolved. Because the gateway is set to
-// verify_jwt = true, the token is already validated; we call getUser only to
-// learn WHO the caller is, so we never trust a user id from the request body.
+// Resolve the caller from the request's Authorization bearer token.
+// Because the gateway is set to verify_jwt = true, the token is already
+// validated; we call getUser only to learn WHO the caller is, so we never
+// trust a user id passed in the request body.
 export async function getAuthenticatedUser(req: Request): Promise<AuthedUser | null> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) return null;
@@ -32,8 +28,26 @@ export async function getAuthenticatedUser(req: Request): Promise<AuthedUser | n
   return { id: data.user.id, email: data.user.email ?? undefined };
 }
 
-export function isAdmin(user: AuthedUser | null): boolean {
-  return !!user?.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+// Look up the caller's role in the database. Uses the service-role client
+// so RLS doesn't hide the row; the caller is already authenticated at this
+// point via getAuthenticatedUser.
+export async function isAdmin(user: AuthedUser | null): Promise<boolean> {
+  if (!user) return false;
+  const admin = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+  const { data, error } = await admin
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('role', 'admin')
+    .maybeSingle();
+  if (error) {
+    console.error('isAdmin lookup failed:', error);
+    return false;
+  }
+  return !!data;
 }
 
 export function jsonResponse(body: unknown, status = 200): Response {
