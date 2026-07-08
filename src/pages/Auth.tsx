@@ -21,23 +21,19 @@ const Auth = () => {
   const [showResetForm, setShowResetForm] = useState(false);
   const navigate = useNavigate();
   const {
-    user
+    user,
+    isAdmin,
+    loading: authLoading,
   } = useAuth();
   const {
     toast
   } = useToast();
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (wait for role to load)
   useEffect(() => {
-    if (user) {
-      // Check if admin
-      if (user.email === 'gyndok@yahoo.com') {
-        navigate('/admin');
-      } else {
-        navigate('/doctor');
-      }
-    }
-  }, [user, navigate]);
+    if (authLoading || !user) return;
+    navigate(isAdmin ? '/admin' : '/doctor');
+  }, [user, isAdmin, authLoading, navigate]);
   const validateForm = (isSignUp: boolean) => {
     if (!email || !password) {
       setError('Please fill in all required fields');
