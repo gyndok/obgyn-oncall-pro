@@ -29,9 +29,14 @@ import { useNavigate } from "react-router-dom";
 
 // Helper function to parse date-only strings as local dates (avoiding UTC timezone issues)
 const parseLocalDate = (dateString: string) => {
-  const [year, month, day] = dateString.split('-').map(Number);
-  return new Date(year, month - 1, day); // month is 0-indexed
+  const [yearValue, month, day] = dateString.split('-').map(Number);
+  const year = yearValue < 100 ? 2000 + yearValue : yearValue;
+  const date = new Date(year, month - 1, day); // month is 0-indexed
+  date.setFullYear(year); // Avoid JavaScript's 1900-based handling for 2-digit years
+  return date;
 };
+
+const isMonday = (date: Date) => date.getDay() === 1;
 const AdminDashboard = () => {
   console.log('AdminDashboard component rendering');
   const {
@@ -273,7 +278,15 @@ const AdminDashboard = () => {
     }
     setSaving(true);
     try {
-      const startDate = new Date(newBlockStartDate);
+      const startDate = parseLocalDate(newBlockStartDate);
+      if (!isMonday(startDate)) {
+        toast({
+          title: "Error",
+          description: "Block start date must be a Monday",
+          variant: "destructive"
+        });
+        return;
+      }
       const activeDoctorCount = doctors.filter(d => d.active).length;
       const weekCount = activeDoctorCount || 7; // Default to 7 if no doctors
       const endDate = addDays(addWeeks(startDate, weekCount), -1); // N weeks, ending on Sunday
@@ -592,7 +605,7 @@ const AdminDashboard = () => {
             continue;
           }
           
-          const assignmentDate = new Date(date);
+          const assignmentDate = parseLocalDate(date);
           const dayOfWeek = assignmentDate.getDay();
           const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6; // Sun, Fri, Sat
           
@@ -1242,6 +1255,14 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     // Calculate end date dynamically based on active doctor count
     const activeDoctorCount = doctors.filter(d => d.active).length;
     const weekCount = activeDoctorCount || 7;
+    if (!isMonday(editStartDate)) {
+      toast({
+        title: "Error",
+        description: "Block start date must be a Monday",
+        variant: "destructive"
+      });
+      return;
+    }
     const calculatedEndDate = addDays(addWeeks(editStartDate, weekCount), -1);
     setSaving(true);
     try {
