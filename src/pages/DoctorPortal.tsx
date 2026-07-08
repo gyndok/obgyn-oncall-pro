@@ -20,8 +20,11 @@ import { useNavigate } from "react-router-dom";
 
 // Helper function to parse date-only strings as local dates (avoiding UTC timezone issues)
 const parseLocalDate = (dateString: string) => {
-  const [year, month, day] = dateString.split('-').map(Number);
-  return new Date(year, month - 1, day); // month is 0-indexed
+  const [yearValue, month, day] = dateString.split('-').map(Number);
+  const year = yearValue < 100 ? 2000 + yearValue : yearValue;
+  const date = new Date(year, month - 1, day); // month is 0-indexed
+  date.setFullYear(year); // Avoid JavaScript's 1900-based handling for 2-digit years
+  return date;
 };
 
 // Holiday detection function
