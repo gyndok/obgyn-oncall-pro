@@ -1,16 +1,16 @@
 project_id = "yjjxsirrirpnrzrxpjvj"
 
 [functions.google-calendar-auth]
-verify_jwt = false
+verify_jwt = true
 
 [functions.test-calendar-event]
-verify_jwt = false
+verify_jwt = true
 
 [functions.unpublish-schedule]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-schedule-email]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-ai-schedule-lovable]
-verify_jwt = false
+verify_jwt = true

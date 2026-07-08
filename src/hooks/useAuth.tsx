@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { isAdminEmail } from "@/lib/admin";
 
 interface AuthContextType {
   user: User | null;
@@ -26,7 +27,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   // Check if the current user is an admin
-  const isAdmin = user?.email === 'gyndok@yahoo.com';
+  const isAdmin = isAdminEmail(user?.email);
 
   useEffect(() => {
     // Set up auth state listener FIRST

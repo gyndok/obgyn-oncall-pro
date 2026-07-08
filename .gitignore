@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files (values are duplicated in src/integrations/supabase/client.ts)
+.env
+.env.*
+!.env.example
