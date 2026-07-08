@@ -33,6 +33,10 @@ serve(async (req) => {
   }
 
   try {
+    const authedUser = await getAuthenticatedUser(req);
+    if (!authedUser) return unauthorized();
+    if (!isAdmin(authedUser)) return forbidden();
+
     console.log('📝 Starting AI schedule generation...');
     console.log('📝 DeepSeek API Key present:', !!deepseekApiKey);
     console.log('📝 Request body received');
