@@ -20,29 +20,23 @@ const ResetPassword = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if we have reset tokens in the URL
-    const handleResetToken = async () => {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
-      const type = hashParams.get('type');
-      
-      if (type === 'recovery' && accessToken && refreshToken) {
-        // Set the session with the tokens from the URL hash
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken
-        });
-        
-        if (error) {
-          setError('Invalid or expired reset link. Please request a new password reset.');
-        }
-      } else {
-        setError('Invalid or expired reset link. Please request a new password reset.');
+    let ready = false;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || session) {
+        ready = true;
+        setError('');
       }
+    });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) ready = true;
+    });
+    const timer = setTimeout(() => {
+      if (!ready) setError('Invalid or expired reset link. Please request a new password reset.');
+    }, 1500);
+    return () => {
+      clearTimeout(timer);
+      subscription.unsubscribe();
     };
-
-    handleResetToken();
   }, []);
 
   const validateForm = () => {

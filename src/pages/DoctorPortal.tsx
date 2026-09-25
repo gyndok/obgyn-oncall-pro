@@ -113,8 +113,10 @@ const DoctorPortal = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // Fetch calendar events
+  const calendarRequestId = React.useRef(0);
   const fetchCalendarEvents = async () => {
     if (!user?.email) return;
+    const requestId = ++calendarRequestId.current;
     setCalendarLoading(true);
     try {
       // Configure your actual calendar IDs
@@ -138,6 +140,7 @@ const DoctorPortal = () => {
           userEmail: user.email
         }
       });
+      if (requestId !== calendarRequestId.current) return;
       if (error) {
         console.error('Error fetching calendar events:', error);
         toast({
@@ -157,7 +160,7 @@ const DoctorPortal = () => {
         variant: "destructive"
       });
     } finally {
-      setCalendarLoading(false);
+      if (requestId === calendarRequestId.current) setCalendarLoading(false);
     }
   };
 

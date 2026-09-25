@@ -13,3 +13,6 @@ verify_jwt = true
 
 [functions.generate-ai-schedule]
 verify_jwt = true
+
+[functions.fetch-calendar-events]
+verify_jwt = true
