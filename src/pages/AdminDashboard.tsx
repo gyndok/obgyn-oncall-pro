@@ -781,7 +781,7 @@ const AdminDashboard = () => {
       const doctorAssignments = assignments.filter(a => a.doctor_id === doctor.id);
       
       // Create a temporary edge function call just for this doctor
-      const { error } = await supabase.functions.invoke('send-schedule-email', {
+      const { data, error } = await supabase.functions.invoke('send-schedule-email', {
         body: {
           blockId: currentBlock.id,
           customMessage: customEmailMessage.trim() || null,
@@ -791,6 +791,9 @@ const AdminDashboard = () => {
 
       if (error) {
         throw new Error(error.message || 'Failed to send email');
+      }
+      if (!data?.success) {
+        throw new Error(data?.emailResults?.[0]?.error || data?.error || 'Email was not sent');
       }
 
       // Mark as successfully sent
