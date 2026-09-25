@@ -216,10 +216,7 @@ export type Database = {
           created_at: string
           email: string
           first_login_at: string | null
-          google_access_token: string | null
           google_email: string | null
-          google_refresh_token: string | null
-          google_token_expires_at: string | null
           id: string
           is_admin: boolean
           mobile: string | null
@@ -232,10 +229,7 @@ export type Database = {
           created_at?: string
           email: string
           first_login_at?: string | null
-          google_access_token?: string | null
           google_email?: string | null
-          google_refresh_token?: string | null
-          google_token_expires_at?: string | null
           id?: string
           is_admin?: boolean
           mobile?: string | null
@@ -248,10 +242,7 @@ export type Database = {
           created_at?: string
           email?: string
           first_login_at?: string | null
-          google_access_token?: string | null
           google_email?: string | null
-          google_refresh_token?: string | null
-          google_token_expires_at?: string | null
           id?: string
           is_admin?: boolean
           mobile?: string | null
@@ -288,6 +279,38 @@ export type Database = {
           type?: string
         }
         Relationships: []
+      }
+      google_credentials: {
+        Row: {
+          access_token: string | null
+          doctor_id: string
+          expires_at: string | null
+          refresh_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          doctor_id: string
+          expires_at?: string | null
+          refresh_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          doctor_id?: string
+          expires_at?: string | null
+          refresh_token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_credentials_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: true
+            referencedRelation: "doctors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       system_settings: {
         Row: {
@@ -339,7 +362,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      link_my_doctor_account: { Args: never; Returns: undefined }
+      replace_block_assignments: {
+        Args: { p_block_id: string; p_rows: Json }
+        Returns: number
+      }
     }
     Enums: {
       app_role: "admin" | "doctor"

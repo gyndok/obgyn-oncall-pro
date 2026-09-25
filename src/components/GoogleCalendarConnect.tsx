@@ -49,39 +49,41 @@ export const GoogleCalendarConnect: React.FC<GoogleCalendarConnectProps> = ({ on
     const state = urlParams.get('state');
     const error = urlParams.get('error');
 
-    if (error) {
-      console.error('OAuth error:', error);
-      toast.error(`Google Calendar connection failed: ${error}`);
-      
-      // Clean up URL
+    const cleanUrl = () => {
       const url = new URL(window.location.href);
-      url.searchParams.delete('error');
+      ['code', 'state', 'scope', 'error', 'authuser', 'prompt'].forEach((k) => url.searchParams.delete(k));
       window.history.replaceState({}, document.title, url.toString());
+    };
+
+    if (error) {
+      toast.error(`Google Calendar connection failed: ${error}`);
+      cleanUrl();
       return;
     }
 
-    if (code && state === user?.id) {
-      handleOAuthCallback(code);
+    if (code && user) {
+      const expected = sessionStorage.getItem('google_oauth_state');
+      sessionStorage.removeItem('google_oauth_state');
+      if (!expected || state !== expected) {
+        toast.error('Google Calendar connection rejected: security check failed. Please try again.');
+        cleanUrl();
+        return;
+      }
+      handleOAuthCallback(code).finally(cleanUrl);
     }
   }, [user]);
 
   const checkConnectionStatus = async () => {
     if (!user) return;
-
     try {
       const { data, error } = await supabase
         .from('doctors')
-        .select('google_access_token, google_email')
+        .select('google_email')
         .eq('auth_user_id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error checking Google Calendar connection:', error);
-        setIsConnected(false);
-      } else {
-        setIsConnected(!!data?.google_access_token);
-        setGoogleEmail(data?.google_email || null);
-      }
+        .maybeSingle();
+      if (error) throw error;
+      setIsConnected(!!data?.google_email);
+      setGoogleEmail(data?.google_email || null);
     } catch (error) {
       console.error('Error checking connection status:', error);
       setIsConnected(false);
@@ -92,54 +94,25 @@ export const GoogleCalendarConnect: React.FC<GoogleCalendarConnectProps> = ({ on
 
   const handleConnect = async () => {
     if (!user) {
-      console.error('No user found');
       toast.error('Please log in first');
       return;
     }
-
-    console.log('Starting Google Calendar connection...');
     setIsConnecting(true);
-    
-    // Show a toast to inform user what's happening
-    toast.info('Redirecting to Google for authorization...', {
-      duration: 3000
-    });
-    
     try {
-      const redirectUri = window.location.origin + window.location.pathname;
-      console.log('Redirect URI:', redirectUri);
-      console.log('⚠️ IMPORTANT: Make sure this redirect URI is configured in Google Cloud Console');
-      
+      const state = crypto.randomUUID();
+      sessionStorage.setItem('google_oauth_state', state);
       const { data, error } = await supabase.functions.invoke('google-calendar-auth', {
         body: {
           action: 'getAuthUrl',
-          userId: user.id,
-          redirectUri: redirectUri
-        }
+          state,
+          redirectUri: window.location.origin + window.location.pathname,
+        },
       });
-
-      console.log('Edge function response:', { data, error });
-
-      if (error) {
-        console.error('Edge function error:', error);
-        throw error;
-      }
-
-      if (data?.authUrl) {
-        console.log('Redirecting to Google OAuth:', data.authUrl);
-        
-        // Store that we're attempting connection
-        sessionStorage.setItem('google_oauth_attempt', Date.now().toString());
-        
-        // Redirect to Google OAuth - page will go blank while redirecting
-        setTimeout(() => {
-          window.location.href = data.authUrl;
-        }, 500);
-      } else {
-        console.error('No authUrl in response:', data);
-        throw new Error('Failed to get authorization URL');
-      }
-    } catch (error) {
+      if (error) throw error;
+      if (!data?.authUrl) throw new Error(data?.error || 'Failed to get authorization URL');
+      sessionStorage.setItem('google_oauth_attempt', Date.now().toString());
+      window.location.href = data.authUrl;
+    } catch (error: any) {
       console.error('Error initiating Google Calendar connection:', error);
       toast.error(`Failed to connect to Google Calendar: ${error.message || 'Unknown error'}`);
       setIsConnecting(false);
@@ -148,37 +121,21 @@ export const GoogleCalendarConnect: React.FC<GoogleCalendarConnectProps> = ({ on
 
   const handleOAuthCallback = async (code: string) => {
     if (!user) return;
-
     setIsConnecting(true);
     try {
-      const redirectUri = window.location.origin + window.location.pathname;
-      
       const { data, error } = await supabase.functions.invoke('google-calendar-auth', {
         body: {
           action: 'exchangeCode',
-          code: code,
-          userId: user.id,
-          redirectUri: redirectUri
-        }
+          code,
+          redirectUri: window.location.origin + window.location.pathname,
+        },
       });
-
       if (error) throw error;
-
-      if (data?.success) {
-        setIsConnected(true);
-        setGoogleEmail(data.userEmail);
-        toast.success('Google Calendar connected successfully!');
-        onConnected?.();
-        
-        // Clean up URL
-        const url = new URL(window.location.href);
-        url.searchParams.delete('code');
-        url.searchParams.delete('state');
-        url.searchParams.delete('scope');
-        window.history.replaceState({}, document.title, url.toString());
-      } else {
-        throw new Error(data?.error || 'Failed to connect Google Calendar');
-      }
+      if (!data?.success) throw new Error(data?.error || 'Failed to connect Google Calendar');
+      setIsConnected(true);
+      setGoogleEmail(data.userEmail);
+      toast.success('Google Calendar connected successfully!');
+      onConnected?.();
     } catch (error) {
       console.error('Error handling OAuth callback:', error);
       toast.error('Failed to connect Google Calendar');
@@ -189,20 +146,12 @@ export const GoogleCalendarConnect: React.FC<GoogleCalendarConnectProps> = ({ on
 
   const handleDisconnect = async () => {
     if (!user) return;
-
     try {
-      const { error } = await supabase
-        .from('doctors')
-        .update({
-          google_access_token: null,
-          google_refresh_token: null,
-          google_token_expires_at: null,
-          google_email: null,
-        })
-        .eq('auth_user_id', user.id);
-
+      const { data, error } = await supabase.functions.invoke('google-calendar-auth', {
+        body: { action: 'disconnect' },
+      });
       if (error) throw error;
-
+      if (!data?.success) throw new Error(data?.error);
       setIsConnected(false);
       setGoogleEmail(null);
       toast.success('Google Calendar disconnected');

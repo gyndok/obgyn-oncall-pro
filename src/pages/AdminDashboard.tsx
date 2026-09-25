@@ -22,6 +22,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { GoogleCalendarConnect } from "@/components/GoogleCalendarConnect";
 import { AIPromptEditor } from "@/components/AIPromptEditor";
 import { supabase } from "@/integrations/supabase/client";
+import { validateAssignments, type RawAssignment } from "@/lib/schedule/validateAssignments";
 import { format, addDays, addWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -351,6 +352,26 @@ const AdminDashboard = () => {
   // State for Lovable AI generation
   const [generatingWithLovable, setGeneratingWithLovable] = useState(false);
 
+  // Validate a proposed schedule and replace the block's assignments in one safe step.
+  const saveValidatedSchedule = async (raw: RawAssignment[]): Promise<number> => {
+    if (!currentBlock) throw new Error('No active block');
+    const { rows, errors } = validateAssignments(raw, doctors, currentBlock.start_monday_date, currentBlock.end_sunday_date);
+    if (errors.length > 0) {
+      const shown = errors.slice(0, 8).join('\n');
+      const more = errors.length > 8 ? `\n...and ${errors.length - 8} more` : '';
+      throw new Error(`Schedule not saved. Problems found:\n${shown}${more}`);
+    }
+    if (assignments.length > 0 && !window.confirm('This replaces the current schedule for this block. Continue?')) {
+      throw new Error('Cancelled — the current schedule was kept.');
+    }
+    const { data, error } = await supabase.rpc('replace_block_assignments', {
+      p_block_id: currentBlock.id,
+      p_rows: rows as any,
+    });
+    if (error) throw error;
+    return (data as number) ?? rows.length;
+  };
+
   const generateSchedule = async () => {
     if (!currentBlock) return;
     setSaving(true);
@@ -361,7 +382,7 @@ const AdminDashboard = () => {
       const aiPrompt = generateAIPrompt();
 
       // Prepare doctor data for the AI function
-      const doctorData = doctors.map(doctor => ({
+      const doctorData = doctors.filter(d => d.active !== false).map(doctor => ({
         id: doctor.id,
         name: doctor.name
       }));
@@ -390,23 +411,7 @@ const AdminDashboard = () => {
         console.log('📊 Schedule summary:', summary);
       }
 
-      // Add block_id to each assignment
-      const assignmentsWithBlockId = aiAssignments.map((assignment: any) => ({
-        ...assignment,
-        block_id: currentBlock.id
-      }));
-
-      // Clear existing assignments for this block
-      const {
-        error: deleteError
-      } = await supabase.from('assignments').delete().eq('block_id', currentBlock.id);
-      if (deleteError) throw deleteError;
-
-      // Insert new AI-generated assignments
-      const {
-        error: insertError
-      } = await supabase.from('assignments').insert(assignmentsWithBlockId);
-      if (insertError) throw insertError;
+      await saveValidatedSchedule(aiAssignments.map((a: any) => ({ date: a.date, doctor_id: a.doctor_id, doctor_name: a.doctor_name })));
       toast({
         title: "AI Schedule Generated Successfully! 🤖",
         description: `Created ${aiAssignments.length} assignments using DeepSeek AI with doctor preferences`
@@ -434,7 +439,7 @@ const AdminDashboard = () => {
       const aiPrompt = generateAIPrompt();
 
       // Prepare doctor data for the AI function
-      const doctorData = doctors.map(doctor => ({
+      const doctorData = doctors.filter(d => d.active !== false).map(doctor => ({
         id: doctor.id,
         name: doctor.name
       }));
@@ -467,23 +472,7 @@ const AdminDashboard = () => {
         console.log('📊 Schedule summary:', summary);
       }
 
-      // Add block_id to each assignment
-      const assignmentsWithBlockId = aiAssignments.map((assignment: any) => ({
-        ...assignment,
-        block_id: currentBlock.id
-      }));
-
-      // Clear existing assignments for this block
-      const {
-        error: deleteError
-      } = await supabase.from('assignments').delete().eq('block_id', currentBlock.id);
-      if (deleteError) throw deleteError;
-
-      // Insert new AI-generated assignments
-      const {
-        error: insertError
-      } = await supabase.from('assignments').insert(assignmentsWithBlockId);
-      if (insertError) throw insertError;
+      await saveValidatedSchedule(aiAssignments.map((a: any) => ({ date: a.date, doctor_id: a.doctor_id, doctor_name: a.doctor_name })));
       
       toast({
         title: "AI Schedule Generated Successfully! ✨",
@@ -535,7 +524,7 @@ const AdminDashboard = () => {
       }
       
       // Convert ChatGPT data to assignments format
-      const importedAssignments = [];
+      const importedAssignments: RawAssignment[] = [];
       const doctorNameToId: Record<string, string> = {};
       
       // Create doctor name mapping (handle last names and full names)
@@ -566,24 +555,7 @@ const AdminDashboard = () => {
             continue;
           }
           
-          const doctorId = doctorNameToId[doctorName] || 
-                          Object.keys(doctorNameToId).find(key => 
-                            key.includes(doctorName) || doctorName.includes(key)
-                          );
-          
-          if (!doctorId) {
-            console.warn(`Doctor not found: ${doctorName}`);
-            continue;
-          }
-          
-          importedAssignments.push({
-            block_id: currentBlock.id,
-            week_index: weekIndex,
-            date: date,
-            weekday_name: weekdayName,
-            is_weekend: isWeekend,
-            doctor_id: doctorId
-          });
+          importedAssignments.push({ date, doctor_name: entry.doctor });
         }
       } else {
         // Handle simple array format or single entries
@@ -594,35 +566,7 @@ const AdminDashboard = () => {
           const doctorName = (entry.doctor || entry.Doctor || entry.name || entry.Name)?.toLowerCase();
           
           if (!date || !doctorName) continue;
-          
-          const doctorId = doctorNameToId[doctorName] || 
-                          Object.keys(doctorNameToId).find(key => 
-                            key.includes(doctorName) || doctorName.includes(key)
-                          );
-          
-          if (!doctorId) {
-            console.warn(`Doctor not found: ${doctorName}`);
-            continue;
-          }
-          
-          const assignmentDate = parseLocalDate(date);
-          const dayOfWeek = assignmentDate.getDay();
-          const isWeekend = dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6; // Sun, Fri, Sat
-          
-          // Calculate week index
-          const blockStart = parseLocalDate(currentBlock.start_monday_date);
-          const weekIndex = Math.floor((assignmentDate.getTime() - blockStart.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-          
-          const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-          
-          importedAssignments.push({
-            block_id: currentBlock.id,
-            week_index: weekIndex,
-            date: format(assignmentDate, 'yyyy-MM-dd'),
-            weekday_name: weekdays[dayOfWeek],
-            is_weekend: isWeekend,
-            doctor_id: doctorId
-          });
+          importedAssignments.push({ date: String(date), doctor_name: entry.doctor || entry.Doctor || entry.name || entry.Name });
         }
       }
       
@@ -630,19 +574,7 @@ const AdminDashboard = () => {
         throw new Error('No valid schedule entries found in the imported data');
       }
       
-      // Clear existing assignments and insert imported ones
-      const { error: deleteError } = await supabase
-        .from('assignments')
-        .delete()
-        .eq('block_id', currentBlock.id);
-      
-      if (deleteError) throw deleteError;
-      
-      const { error: insertError } = await supabase
-        .from('assignments')
-        .insert(importedAssignments);
-      
-      if (insertError) throw insertError;
+      await saveValidatedSchedule(importedAssignments);
       
       toast({
         title: "ChatGPT Schedule Imported Successfully!",
@@ -686,19 +618,17 @@ const AdminDashboard = () => {
         error
       } = await supabase.functions.invoke('publish-to-calendar', {
         body: {
-          blockId: currentBlock.id,
-          userId: user?.id
+          blockId: currentBlock.id
         }
       });
-      console.log('Supabase function response:', {
-        data,
-        error
-      });
-      if (error) throw error;
+      if (error) {
+        const details = await (error as any).context?.json?.().catch(() => null);
+        throw new Error(details?.error || error.message);
+      }
       if (data.success) {
         setPublishStatus({
           type: 'success',
-          message: `Successfully published ${data.eventsCreated} events to Google Calendar! (${data.callEvents} call events, ${data.offEvents} off events)`
+          message: data.message || `Successfully published ${data.eventsCreated} events to Google Calendar!`
         });
         setLastPublishResult(data);
         await fetchData(); // Refresh to show updated status
@@ -787,18 +717,24 @@ const AdminDashboard = () => {
   const unpublishSchedule = async () => {
     if (!currentBlock || !user) return;
     
+    const { data: countData } = await supabase.functions.invoke('unpublish-schedule', {
+      body: { blockId: currentBlock.id, countOnly: true }
+    });
+    const n = countData?.count ?? 0;
+    if (!window.confirm(`This removes ${n > 0 ? n : 'all'} events for this block from the shared Google calendars. Continue?`)) return;
+
     setUnpublishing(true);
     setUnpublishStatus(null);
     
     try {
       const { data, error } = await supabase.functions.invoke('unpublish-schedule', {
-        body: { 
-          blockId: currentBlock.id,
-          userId: user.id
-        }
+        body: { blockId: currentBlock.id }
       });
       
-      if (error) throw error;
+      if (error) {
+        const details = await (error as any).context?.json?.().catch(() => null);
+        throw new Error(details?.error || error.message);
+      }
       
       if (data.success) {
         setUnpublishStatus({
