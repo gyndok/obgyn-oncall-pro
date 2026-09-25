@@ -366,125 +366,46 @@ const AdminDashboard = () => {
     return (data as number) ?? rows.length;
   };
 
-  const generateSchedule = async () => {
+  const runAISchedule = async (provider: 'deepseek' | 'lovable') => {
     if (!currentBlock) return;
-    setSaving(true);
+    const setBusy = provider === 'lovable' ? setGeneratingWithLovable : setSaving;
+    setBusy(true);
     try {
-      console.log('🤖 Generating AI-powered schedule with DeepSeek...');
-
-      // Generate the AI prompt with all doctor preferences
-      const aiPrompt = generateAIPrompt();
-
-      // Prepare doctor data for the AI function
-      const doctorData = doctors.filter(d => d.active !== false).map(doctor => ({
-        id: doctor.id,
-        name: doctor.name
-      }));
-
-      // Call the AI scheduling edge function
+      const doctorData = doctors.filter(d => d.active !== false).map(d => ({ id: d.id, name: d.name }));
       const response = await supabase.functions.invoke('generate-ai-schedule', {
-        body: {
-          prompt: aiPrompt,
-          blockStartDate: currentBlock.start_monday_date,
-          doctors: doctorData
-        }
+        body: { provider, prompt: generateAIPrompt(), doctors: doctorData, vars: getPromptVars() }
       });
       if (response.error) {
-        console.error('AI scheduling error:', response.error);
-        throw new Error(response.error.message || 'Failed to generate AI schedule');
+        let msg = response.error.message || 'Failed to generate AI schedule';
+        try {
+          const ctx = await (response.error as any).context?.json?.();
+          if (ctx?.error) msg = ctx.error;
+        } catch { /* ignore */ }
+        throw new Error(msg);
       }
-      const {
-        assignments: aiAssignments,
-        summary
-      } = response.data;
-      if (!aiAssignments || aiAssignments.length === 0) {
-        throw new Error('AI returned no assignments');
-      }
-      console.log(`📋 AI generated ${aiAssignments.length} assignments`);
-      if (summary) {
-        console.log('📊 Schedule summary:', summary);
-      }
-
-      await saveValidatedSchedule(aiAssignments.map((a: any) => ({ date: a.date, doctor_id: a.doctor_id, doctor_name: a.doctor_name })));
+      const aiAssignments = response.data?.assignments;
+      if (!aiAssignments || aiAssignments.length === 0) throw new Error('AI returned no assignments');
+      const saved = await saveValidatedSchedule(aiAssignments.map((a: any) => ({ date: a.date, doctor_id: a.doctor_id, doctor_name: a.doctor_name })));
+      if (saved === undefined || saved === null) return;
       toast({
-        title: "AI Schedule Generated Successfully! 🤖",
-        description: `Created ${aiAssignments.length} assignments using DeepSeek AI with doctor preferences`
+        title: "AI Schedule Generated",
+        description: `Created ${aiAssignments.length} assignments using ${provider === 'lovable' ? 'Lovable AI' : 'DeepSeek'}`
       });
       fetchData();
     } catch (error: any) {
       console.error('Error generating AI schedule:', error);
       toast({
         title: "AI Schedule Generation Failed",
-        description: error.message || "Failed to generate schedule. Check console for details.",
+        description: error.message || "Failed to generate schedule.",
         variant: "destructive"
       });
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   };
+  const generateSchedule = () => runAISchedule('deepseek');
+  const generateScheduleWithLovable = () => runAISchedule('lovable');
 
-  const generateScheduleWithLovable = async () => {
-    if (!currentBlock) return;
-    setGeneratingWithLovable(true);
-    try {
-      console.log('✨ Generating AI-powered schedule with Lovable AI...');
-
-      // Generate the AI prompt with all doctor preferences
-      const aiPrompt = generateAIPrompt();
-
-      // Prepare doctor data for the AI function
-      const doctorData = doctors.filter(d => d.active !== false).map(doctor => ({
-        id: doctor.id,
-        name: doctor.name
-      }));
-
-      // Call the Lovable AI scheduling edge function
-      const response = await supabase.functions.invoke('generate-ai-schedule-lovable', {
-        body: {
-          prompt: aiPrompt,
-          blockStartDate: currentBlock.start_monday_date,
-          doctors: doctorData
-        }
-      });
-      
-      if (response.error) {
-        console.error('Lovable AI scheduling error:', response.error);
-        throw new Error(response.error.message || 'Failed to generate AI schedule');
-      }
-      
-      const {
-        assignments: aiAssignments,
-        summary
-      } = response.data;
-      
-      if (!aiAssignments || aiAssignments.length === 0) {
-        throw new Error('AI returned no assignments');
-      }
-      
-      console.log(`📋 Lovable AI generated ${aiAssignments.length} assignments`);
-      if (summary) {
-        console.log('📊 Schedule summary:', summary);
-      }
-
-      await saveValidatedSchedule(aiAssignments.map((a: any) => ({ date: a.date, doctor_id: a.doctor_id, doctor_name: a.doctor_name })));
-      
-      toast({
-        title: "AI Schedule Generated Successfully! ✨",
-        description: `Created ${aiAssignments.length} assignments using Lovable AI (Gemini) with doctor preferences`
-      });
-      fetchData();
-    } catch (error: any) {
-      console.error('Error generating AI schedule with Lovable:', error);
-      toast({
-        title: "Lovable AI Schedule Generation Failed",
-        description: error.message || "Failed to generate schedule. Check console for details.",
-        variant: "destructive"
-      });
-    } finally {
-      setGeneratingWithLovable(false);
-    }
-  };
-  
   // Import ChatGPT schedule
   const importChatGPTSchedule = async () => {
     if (!importText.trim() && !importFile || !currentBlock) return;
