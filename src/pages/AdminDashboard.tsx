@@ -1574,7 +1574,8 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
           unavailable_dates: editRequestForm.unavailable_dates.map(date => format(date, 'yyyy-MM-dd')),
           preferred_weekends: editRequestForm.preferred_weekends,
           notes: editRequestForm.notes,
-          status: 'not_started'
+          status: 'submitted',
+          submitted_at: new Date().toISOString()
         });
         if (error) throw error;
         toast({
