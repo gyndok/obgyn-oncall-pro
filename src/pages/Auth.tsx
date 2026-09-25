@@ -54,40 +54,6 @@ const Auth = () => {
     }
     return true;
   };
-  const linkDoctorAccount = async (userId: string, userEmail: string) => {
-    try {
-      // Check if there's an existing doctor record with this email
-      const {
-        data: existingDoctor,
-        error: doctorError
-      } = await supabase.from('doctors').select('*').eq('email', userEmail.toLowerCase()).single();
-      if (doctorError && doctorError.code !== 'PGRST116') {
-        console.error('Error checking for existing doctor:', doctorError);
-        return;
-      }
-      if (existingDoctor && !existingDoctor.auth_user_id) {
-        // Link the existing doctor record to the new auth user
-        const {
-          error: updateError
-        } = await supabase.from('doctors').update({
-          auth_user_id: userId,
-          first_login_at: new Date().toISOString(),
-          account_setup_completed: true
-        }).eq('id', existingDoctor.id);
-        if (updateError) {
-          console.error('Error linking doctor account:', updateError);
-        } else {
-          console.log('Successfully linked doctor account');
-          toast({
-            title: "Account Linked",
-            description: "Your account has been successfully linked to your doctor profile."
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error in linkDoctorAccount:', error);
-    }
-  };
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm(true)) return;
@@ -119,7 +85,6 @@ const Auth = () => {
       }
       if (data.user) {
         // Try to link to existing doctor record
-        await linkDoctorAccount(data.user.id, email);
         toast({
           title: "Account Created",
           description: "Please check your email to verify your account, then you can sign in."
@@ -197,7 +162,6 @@ const Auth = () => {
       }
       if (data.user) {
         // Try to link to existing doctor record if not already linked
-        await linkDoctorAccount(data.user.id, email);
         toast({
           title: "Welcome back!",
           description: "You have been successfully signed in."
