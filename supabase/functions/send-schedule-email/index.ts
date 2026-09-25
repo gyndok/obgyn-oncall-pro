@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
 import { Resend } from "npm:resend@2.0.0";
 import { corsHeaders, getAuthenticatedUser, isAdmin, unauthorized, forbidden } from "../_shared/auth.ts";
+import { EMAIL_FROM, escapeHtml } from "../_shared/email.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -134,7 +135,7 @@ const handler = async (req: Request): Promise<Response> => {
                 day: 'numeric'
               });
               return `<li style="margin: 8px 0; padding: 8px; background-color: ${assignment.is_weekend ? '#fef3c7' : '#f0f9ff'}; border-radius: 4px;">
-                <strong>${formattedDate}</strong>
+                <strong>${escapeHtml(formattedDate)}</strong>
                 ${assignment.is_weekend ? ' <span style="color: #92400e; font-weight: bold;">(Weekend Call)</span>' : ''}
               </li>`;
             }).join('');
@@ -154,8 +155,8 @@ const handler = async (req: Request): Promise<Response> => {
 
         console.log(`Sending email to ${doctor.name}...`);
 
-        const emailResponse = await resend.emails.send({
-          from: "Call Schedule Portal <schedule@geffreyklein.com>",
+        const { data: emailData, error: emailError } = await resend.emails.send({
+          from: EMAIL_FROM,
           to: [doctor.email],
           subject: `Your Call Schedule - ${blockTitle}`,
           html: `
@@ -163,13 +164,13 @@ const handler = async (req: Request): Promise<Response> => {
               <h1 style="color: #333; text-align: center; margin-bottom: 30px;">Your Call Schedule</h1>
               
               <p style="color: #666; font-size: 16px; line-height: 1.5; margin-bottom: 20px;">
-                Dear Dr. ${doctor.name},
+                Dear Dr. ${escapeHtml(doctor.name)},
               </p>
               
               ${customMessage ? `
               <div style="background-color: #f0f9ff; padding: 15px; margin: 20px 0;">
                 <h3 style="margin: 0 0 10px 0; color: #333;">Message from Administration</h3>
-                <p style="margin: 0; color: #666; white-space: pre-wrap;">${customMessage}</p>
+                <p style="margin: 0; color: #666; white-space: pre-wrap;">${escapeHtml(customMessage)}</p>
               </div>
               ` : ''}
               
@@ -178,7 +179,7 @@ const handler = async (req: Request): Promise<Response> => {
               </p>
               
               <div style="background-color: #f9f9f9; padding: 15px; margin: 20px 0;">
-                <strong style="color: #333;">${blockTitle}</strong>
+                <strong style="color: #333;">${escapeHtml(blockTitle)}</strong>
               </div>
               
               <h2 style="color: #333; margin: 30px 0 20px 0;">Your Assignments:</h2>
@@ -212,13 +213,14 @@ const handler = async (req: Request): Promise<Response> => {
           `,
         });
 
-        console.log(`✓ SUCCESS: Email sent to ${doctor.name} (Response ID: ${emailResponse?.id})`);
+        if (emailError) throw new Error(emailError.message || "Resend rejected the email");
+        console.log(`✓ SUCCESS: Email sent to ${doctor.name} (Response ID: ${emailData?.id})`);
         emailResults.push({
           doctor: doctor.name,
           email: doctor.email,
           success: true,
           assignmentCount: doctorAssignments.length,
-          resendId: emailResponse?.id
+          resendId: emailData?.id
         });
 
       } catch (error: any) {

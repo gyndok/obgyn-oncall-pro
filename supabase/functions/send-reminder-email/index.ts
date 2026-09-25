@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 import { corsHeaders, getAuthenticatedUser, isAdmin, unauthorized, forbidden } from "../_shared/auth.ts";
+import { EMAIL_FROM, escapeHtml, safeHttpsUrl } from "../_shared/email.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -25,14 +26,22 @@ const handler = async (req: Request): Promise<Response> => {
     if (!authedUser) return unauthorized();
     if (!(await isAdmin(authedUser))) return forbidden();
 
-    const { doctorName, doctorEmail, blockTitle, submissionDeadline, doctorPortalUrl }: ReminderEmailRequest = await req.json();
+    const body: ReminderEmailRequest = await req.json();
+    const doctorEmail = String(body.doctorEmail ?? "").trim();
+    if (!doctorEmail) throw new Error("doctorEmail is required");
+    const doctorName = escapeHtml(body.doctorName);
+    const blockTitleRaw = String(body.blockTitle ?? "").replace(/[\r\n]/g, " ");
+    const blockTitle = escapeHtml(blockTitleRaw);
+    const submissionDeadline = escapeHtml(body.submissionDeadline);
+    const doctorPortalUrl = safeHttpsUrl(body.doctorPortalUrl);
+    const doctorEmailHtml = escapeHtml(doctorEmail);
 
     console.log(`Sending reminder email to ${doctorName} (${doctorEmail})`);
 
-    const emailResponse = await resend.emails.send({
-      from: "Call Schedule <schedule@geffreyklein.com>",
+    const { data: emailData, error: emailError } = await resend.emails.send({
+      from: EMAIL_FROM,
       to: [doctorEmail],
-      subject: `Reminder: Submit Your Call Schedule Preferences - ${blockTitle}`,
+      subject: `Reminder: Submit Your Call Schedule Preferences - ${blockTitleRaw}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2563eb;">Call Schedule Reminder</h2>
@@ -61,7 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
               If this is your first time using the portal, you'll need to create an account:
               <br>• Click the link above
               <br>• Choose "Sign Up" 
-              <br>• Use <strong>this email address (${doctorEmail})</strong> to create your account
+              <br>• Use <strong>this email address (${doctorEmailHtml})</strong> to create your account
               <br>• Once signed up, your account will be automatically linked to your doctor profile
             </p>
           </div>
@@ -78,9 +87,16 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Reminder email sent successfully:", emailResponse);
+    if (emailError) {
+      console.error("Resend error:", emailError);
+      return new Response(JSON.stringify({ success: false, error: emailError.message }), {
+        status: 502,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+    console.log("Reminder email sent, id:", emailData?.id);
 
-    return new Response(JSON.stringify({ success: true, emailResponse }), {
+    return new Response(JSON.stringify({ success: true, id: emailData?.id }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
