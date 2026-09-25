@@ -214,11 +214,11 @@ const DoctorPortal = () => {
         }
         setDoctorRecord(doctor);
 
-        // Get current active block (only show current, not old completed ones)
+        // Most recent non-draft block (closed/published ones show read-only)
         const {
           data: blocks,
           error: blockError
-        } = await supabase.from('blocks').select('*').eq('status', 'collecting').order('created_at', {
+        } = await supabase.from('blocks').select('*').neq('status', 'draft').order('start_monday_date', {
           ascending: false
         }).limit(1);
         if (blockError) throw blockError;
@@ -280,7 +280,8 @@ const DoctorPortal = () => {
       }
     };
     fetchData();
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
   const handleSaveDraft = async () => {
     if (!currentBlock || !doctorRecord) return;
     setSaving(true);

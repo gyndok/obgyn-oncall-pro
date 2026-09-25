@@ -245,7 +245,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Mass email complete: ${successCount}/${totalCount} emails sent successfully`);
 
     return new Response(JSON.stringify({ 
-      success: true, 
+      success: totalCount - successCount === 0,
       emailResults,
       summary: {
         totalEmails: totalCount,

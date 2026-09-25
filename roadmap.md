@@ -1,6 +1,9 @@
-# Roadmap (LOVABLE_FIXES_2026-09)
+# Roadmap (round 3 fixes)
 
-- [x] Batch 1: Tasks 1–5 (unsafe functions removed, safe publish/unpublish, atomic validated schedule save, doctor/token lockdown)
-- [ ] Batch 2: Tasks 6–8 (emails; blocked on verified Resend domain + EMAIL_FROM), portal bugs, team status summary
-- [ ] Batch 3: Tasks 9–10 (merged AI function, small bug fixes)
-- [ ] Batch 4: Tasks 11–13 + housekeeping (UI polish)
+- [x] A: no page reload on token refresh
+- [x] B: stored AI prompt (LeBlanc rule kept in stored prompt), hardcoded LeBlanc removed from code, confirm before AI
+- [x] D: group email hardening + send log
+- [x] E: honest schedule-email/reminder results
+- [x] F: portal/publish leftovers (F4 skipped)
+- [x] G: README (removing .env from GitHub history must be done by user)
+- Skipped by user: C, F4

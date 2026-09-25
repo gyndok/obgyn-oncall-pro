@@ -305,12 +305,16 @@ const AdminDashboard = () => {
       if (error) throw error;
       
       // Clean up old doctor requests from previous blocks to avoid confusion
-      await cleanupOldData(newBlock.id);
-      
-      toast({
-        title: "Success",
-        description: "New call block created successfully! Old doctor requests have been archived."
-      });
+      let cleanupOk = true;
+      try {
+        await cleanupOldData(newBlock.id);
+      } catch (cleanupError) {
+        console.error('Cleanup after block creation failed:', cleanupError);
+        cleanupOk = false;
+      }
+      toast(cleanupOk
+        ? { title: "Success", description: "New call block created successfully! Old doctor requests have been archived." }
+        : { title: "Block created", description: "Block created, but old data cleanup failed.", variant: "destructive" });
       setShowCreateDialog(false);
       setNewBlockStartDate("");
       setNewBlockDeadline("");
@@ -355,7 +359,7 @@ const AdminDashboard = () => {
   const [generatingWithLovable, setGeneratingWithLovable] = useState(false);
 
   // Validate a proposed schedule and replace the block's assignments in one safe step.
-  const saveValidatedSchedule = async (raw: RawAssignment[]): Promise<number> => {
+  const saveValidatedSchedule = async (raw: RawAssignment[], alreadyConfirmed = false): Promise<number> => {
     if (!currentBlock) throw new Error('No active block');
     const { rows, errors } = validateAssignments(raw, doctors, currentBlock.start_monday_date, currentBlock.end_sunday_date);
     if (errors.length > 0) {
@@ -363,7 +367,7 @@ const AdminDashboard = () => {
       const more = errors.length > 8 ? `\n...and ${errors.length - 8} more` : '';
       throw new Error(`Schedule not saved. Problems found:\n${shown}${more}`);
     }
-    if (assignments.length > 0 && !(await confirm({ title: 'Replace schedule?', description: 'This replaces the current schedule for this block.', confirmLabel: 'Replace' }))) {
+    if (!alreadyConfirmed && assignments.length > 0 && !(await confirm({ title: 'Replace schedule?', description: 'This replaces the current schedule for this block.', confirmLabel: 'Replace' }))) {
       throw new Error('Cancelled — the current schedule was kept.');
     }
     const { data, error } = await supabase.rpc('replace_block_assignments', {
@@ -376,6 +380,8 @@ const AdminDashboard = () => {
 
   const runAISchedule = async (provider: 'deepseek' | 'lovable') => {
     if (!currentBlock) return;
+    // Ask before spending an AI call, not after it returns
+    if (assignments.length > 0 && !(await confirm({ title: 'Replace schedule?', description: 'This replaces the current schedule for this block.', confirmLabel: 'Generate' }))) return;
     const setBusy = provider === 'lovable' ? setGeneratingWithLovable : setGeneratingDeepseek;
     setBusy(true);
     try {
@@ -463,20 +469,7 @@ const AdminDashboard = () => {
       
       // Convert ChatGPT data to assignments format
       const importedAssignments: RawAssignment[] = [];
-      const doctorNameToId: Record<string, string> = {};
-      
-      // Create doctor name mapping (handle last names and full names)
-      doctors.forEach(doctor => {
-        const lastName = doctor.name.split(' ').pop()?.toLowerCase();
-        const firstName = doctor.name.split(' ')[0]?.toLowerCase();
-        if (lastName) {
-          doctorNameToId[lastName] = doctor.id;
-          doctorNameToId[doctor.name.toLowerCase()] = doctor.id;
-        }
-        if (firstName) {
-          doctorNameToId[firstName] = doctor.id;
-        }
-      });
+
       
       // Handle structured ChatGPT JSON format
       if (scheduleData.assignments && Array.isArray(scheduleData.assignments)) {
@@ -733,22 +726,16 @@ const AdminDashboard = () => {
       if (error) {
         throw new Error(error.message || 'Failed to send mass emails');
       }
-      
-      console.log('Mass email result:', data);
-      
-      if (data.success) {
-        const { summary } = data;
-        setEmailStatus({
-          type: 'success',
-          message: `Successfully sent ${summary.successfulEmails}/${summary.totalEmails} emails`
-        });
-        
-        toast({
-          title: "Mass Email Sent",
-          description: `Successfully sent schedule emails to ${summary.successfulEmails}/${summary.totalEmails} doctors`
-        });
+      if (!data?.summary) throw new Error(data?.error || 'Unknown error occurred');
+      const { summary } = data;
+      const failedNames: string[] = (data.results || []).filter((r: any) => !r.success).map((r: any) => r.doctor || r.name || r.email).filter(Boolean);
+      if (summary.failedEmails > 0) {
+        const msg = `Sent ${summary.successfulEmails}/${summary.totalEmails}. Failed: ${failedNames.join(', ') || summary.failedEmails}`;
+        setEmailStatus({ type: 'error', message: msg });
+        toast({ title: "Some emails failed", description: msg, variant: "destructive" });
       } else {
-        throw new Error(data.error || 'Unknown error occurred');
+        setEmailStatus({ type: 'success', message: `Successfully sent ${summary.successfulEmails}/${summary.totalEmails} emails` });
+        toast({ title: "Mass Email Sent", description: `Schedule emails sent to ${summary.successfulEmails}/${summary.totalEmails} doctors` });
       }
       
     } catch (error: any) {
@@ -794,7 +781,7 @@ const AdminDashboard = () => {
       const doctorAssignments = assignments.filter(a => a.doctor_id === doctor.id);
       
       // Create a temporary edge function call just for this doctor
-      const { error } = await supabase.functions.invoke('send-schedule-email', {
+      const { data, error } = await supabase.functions.invoke('send-schedule-email', {
         body: {
           blockId: currentBlock.id,
           customMessage: customEmailMessage.trim() || null,
@@ -804,6 +791,9 @@ const AdminDashboard = () => {
 
       if (error) {
         throw new Error(error.message || 'Failed to send email');
+      }
+      if (!data?.success) {
+        throw new Error(data?.emailResults?.[0]?.error || data?.error || 'Email was not sent');
       }
 
       // Mark as successfully sent
@@ -952,7 +942,6 @@ const AdminDashboard = () => {
 
 * ${doctorNamesStr}
 
-  * Standing constraint: **LeBlanc may never be scheduled on a Tuesday.**
 
 **Hard Constraints (must never be violated)**
 
@@ -964,7 +953,7 @@ const AdminDashboard = () => {
    * That doctor **cannot** be assigned the **Monday immediately after** it.
 4. **Weekday totals:** Across the ${weekCount} weeks, each doctor is assigned **exactly ${weekdayCount} weekdays** from **Monday–Thursday** (no Fri/Sat/Sun count toward this).
 5. **Max one weekday per week per doctor:** For every doctor, in each week, at most **one** of Mon–Thu may be assigned to that doctor.
-6. **Doctor-specific rule:** **LeBlanc** is assigned **0 Tuesdays** across the entire block.
+6. **Doctor-specific rules:** Follow every doctor-specific rule in the system instructions.
 7. **Time-off / Unavailability:** Any date listed as unavailable for a doctor is a **hard exclude** for that doctor.
 8. **Date bounds:** Do not assign outside the ${totalDays}-day window.
 
@@ -1030,7 +1019,7 @@ Respond with JSON only — no other text — in exactly this shape, one entry pe
 doctor_name must be one of: ${doctorNamesStr}
 
 **Validator (run before returning output)**
-Confirm all of the following are true; otherwise set \`hard_constraints_passed=false\` and list each violation in \`errors\`:
+Confirm all of the following are true; otherwise return {"schedule":[]}:
 
 * Every date in the ${totalDays}-day range is assigned exactly once.
 * For each doctor:
@@ -1040,13 +1029,13 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
   * **Zero** assignment on the Mon immediately after their weekend.
   * Exactly **${weekdayCount}** total assignments among Mon–Thu across the full block.
   * In each week, **≤1** assignment among Mon–Thu.
-* For LeBlanc: **0** Tuesday assignments.
+* Every doctor-specific rule in the system instructions is followed.
 * No assignment occurs on a date marked unavailable for that doctor.
 
 **Tie-Breakers (if multiple optimal solutions)**
 
 1. Prefer giving each doctor one weekday in the first half and one in the last half of the block when possible.
-2. Prefer distributing Tuesday assignments evenly among the doctors who can take Tuesday (never LeBlanc).
+2. Prefer distributing each weekday evenly among the doctors allowed to take it.
 3. Prefer that a doctor's weekend be as close as possible to their preferred weekend if an exact match isn't feasible.
 4. If still tied, choose the lexicographically smallest schedule by (week, day, doctor name).
 
@@ -1287,7 +1276,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     if (!Array.isArray(doctors) || !Array.isArray(doctorRequests)) {
       return [];
     }
-    return doctors.map(doctor => {
+    return doctors.filter(doctor => doctor.active).map(doctor => {
       const request = doctorRequests.find(req => req.doctors?.email === doctor.email);
       return {
         ...doctor,
@@ -1409,8 +1398,12 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
       } catch (error) {
         console.error(`Error sending email to ${doctor.name}:`, error);
       }
-      if (success) successCount++; else errorCount++;
-      setReminderSends(prev => ({ ...prev, [doctor.id]: { sentAt: Date.now(), success } }));
+      if (success) {
+        successCount++;
+        setReminderSends(prev => ({ ...prev, [doctor.id]: { sentAt: Date.now(), success } }));
+      } else {
+        errorCount++; // no cooldown on failure, so it can be retried
+      }
     }
     if (skippedCount > 0) {
       toast({ title: "Some skipped", description: `${skippedCount} doctor(s) got a reminder in the last 24 hours and were skipped.` });
@@ -1494,7 +1487,6 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
       return;
     }
     try {
-      console.log(`📧 Sending individual reminder email to ${doctor.name} (${doctor.email})`);
       const blockDates = currentBlock ? `${format(parseLocalDate(currentBlock.start_monday_date), 'MMMM d')} - ${format(parseLocalDate(currentBlock.end_sunday_date), 'MMMM d, yyyy')}` : 'Call Block';
       const deadlineText = currentBlock?.deadline ? format(new Date(currentBlock.deadline), 'MMMM d, yyyy') : 'TBD';
       const response = await supabase.functions.invoke('send-reminder-email', {
@@ -1506,25 +1498,16 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
           doctorPortalUrl: `${window.location.origin}/doctor`
         }
       });
-      const success = !response.error;
-
-      // Update reminder tracking state
-      setReminderSends(prev => ({
-        ...prev,
-        [doctor.id]: {
-          sentAt: Date.now(),
-          success
-        }
-      }));
       if (response.error) {
+        // Failed sends don't start the 24h cooldown, so you can retry right away
         console.error(`Failed to send email to ${doctor.name}:`, response.error);
         toast({
           title: "Failed to Send Reminder",
-          description: "Please check the logs for details.",
+          description: `The reminder to ${doctor.name} didn't go out. You can try again.`,
           variant: "destructive"
         });
       } else {
-        console.log(`✅ Email sent successfully to ${doctor.name}`);
+        setReminderSends(prev => ({ ...prev, [doctor.id]: { sentAt: Date.now(), success: true } }));
         toast({
           title: "Reminder Sent",
           description: `Email reminder sent to ${doctor.name}`
@@ -1532,18 +1515,9 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
       }
     } catch (error) {
       console.error(`Error sending email to ${doctor.name}:`, error);
-
-      // Track failed attempt
-      setReminderSends(prev => ({
-        ...prev,
-        [doctor.id]: {
-          sentAt: Date.now(),
-          success: false
-        }
-      }));
       toast({
         title: "Error",
-        description: "Failed to send reminder email",
+        description: `The reminder to ${doctor.name} didn't go out. You can try again.`,
         variant: "destructive"
       });
     }
@@ -2387,7 +2361,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                 <div className="flex flex-wrap gap-2">
                   {editRequestForm.unavailable_dates.map((date, index) => <Badge key={index} variant="outline" className="px-2 py-1">
                       {format(date, 'MMM d, yyyy')}
-                      <Button variant="ghost" size="sm" className="h-4 w-4 p-0 ml-2 hover:bg-destructive hover:text-destructive-foreground" onClick={() => removeUnavailableDate(date)}>
+                      <Button variant="ghost" size="sm" aria-label={`Remove ${format(date, 'MMM d, yyyy')}`} className="h-4 w-4 p-0 ml-2 hover:bg-destructive hover:text-destructive-foreground" onClick={() => removeUnavailableDate(date)}>
                         <X className="h-3 w-3" />
                       </Button>
                     </Badge>)}
@@ -2416,7 +2390,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
             <div>
               <Label className="text-base font-medium">Preferred Weekends</Label>
               <div className="grid grid-cols-2 gap-2 mt-2">
-                {Array.from({length: doctors.filter(d => d.active).length || 7}, (_, i) => i + 1).map(weekNum => {
+                {Array.from({length: currentBlock ? Math.round((differenceInCalendarDays(parseLocalDate(currentBlock.end_sunday_date), parseLocalDate(currentBlock.start_monday_date)) + 1) / 7) : (doctors.filter(d => d.active).length || 7)}, (_, i) => i + 1).map(weekNum => {
                 const isSelected = editRequestForm.preferred_weekends.includes(weekNum);
                 const weekEndDates = currentBlock ? (() => {
                   const startDate = parseLocalDate(currentBlock.start_monday_date);

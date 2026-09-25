@@ -134,7 +134,6 @@ serve(async (req) => {
         continue;
       }
       const g = await res.json();
-      created++;
       const { error: insErr } = await supabase.from('calendar_publishes').insert({
         block_id: blockId,
         doctor_id: ev.doctorId,
@@ -142,7 +141,17 @@ serve(async (req) => {
         google_calendar_id: ev.calendarId,
         google_event_id: g.id,
       });
-      if (insErr) console.error('Failed to record published event:', insErr);
+      if (insErr) {
+        // Untracked events could never be cleaned up later, so remove it and count as a failure
+        console.error('Failed to record published event:', insErr);
+        failures.push(`${ev.body.summary} ${ev.startDate}: could not record event (${insErr.message})`);
+        await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(ev.calendarId)}/events/${encodeURIComponent(g.id)}`,
+          { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } },
+        ).catch((e) => console.error('Failed to delete orphan event:', e));
+        continue;
+      }
+      created++;
     }
 
     if (failures.length > 0) {
