@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.1';
 import { Resend } from "npm:resend@2.0.0";
 import { corsHeaders, getAuthenticatedUser, isAdmin, unauthorized, forbidden } from "../_shared/auth.ts";
 import { EMAIL_FROM, escapeHtml } from "../_shared/email.ts";

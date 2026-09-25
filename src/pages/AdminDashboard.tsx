@@ -27,6 +27,7 @@ import { format, addDays, addWeeks, differenceInCalendarDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { useConfirm } from "@/hooks/useConfirm";
 
 // Helper function to parse date-only strings as local dates (avoiding UTC timezone issues)
 const parseLocalDate = (dateString: string) => {
@@ -52,7 +53,12 @@ const AdminDashboard = () => {
   const [doctorRequests, setDoctorRequests] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false); // block create/status/dates
+  const [savingDoctor, setSavingDoctor] = useState(false);
+  const [savingRequest, setSavingRequest] = useState(false);
+  const [generatingDeepseek, setGeneratingDeepseek] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // Block creation form state
   const [newBlockStartDate, setNewBlockStartDate] = useState("");
@@ -356,7 +362,7 @@ const AdminDashboard = () => {
       const more = errors.length > 8 ? `\n...and ${errors.length - 8} more` : '';
       throw new Error(`Schedule not saved. Problems found:\n${shown}${more}`);
     }
-    if (assignments.length > 0 && !window.confirm('This replaces the current schedule for this block. Continue?')) {
+    if (assignments.length > 0 && !(await confirm({ title: 'Replace schedule?', description: 'This replaces the current schedule for this block.', confirmLabel: 'Replace' }))) {
       throw new Error('Cancelled — the current schedule was kept.');
     }
     const { data, error } = await supabase.rpc('replace_block_assignments', {
@@ -369,7 +375,7 @@ const AdminDashboard = () => {
 
   const runAISchedule = async (provider: 'deepseek' | 'lovable') => {
     if (!currentBlock) return;
-    const setBusy = provider === 'lovable' ? setGeneratingWithLovable : setSaving;
+    const setBusy = provider === 'lovable' ? setGeneratingWithLovable : setGeneratingDeepseek;
     setBusy(true);
     try {
       const doctorData = doctors.filter(d => d.active !== false).map(d => ({ id: d.id, name: d.name }));
@@ -405,6 +411,21 @@ const AdminDashboard = () => {
     }
   };
   const generateSchedule = () => runAISchedule('deepseek');
+  const exportCsv = () => {
+    const nameOf = (id: string) => doctors.find(d => d.id === id)?.name ?? '';
+    const rows = [...assignments].sort((a, b) => a.date.localeCompare(b.date)).map(a => {
+      const d = parseLocalDate(a.date);
+      const dow = d.getDay();
+      return [a.date, format(d, 'EEEE'), nameOf(a.doctor_id), dow === 0 || dow === 5 || dow === 6 ? 'yes' : 'no'];
+    });
+    const csv = [['date', 'weekday', 'doctor', 'weekend'], ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `call-schedule-${currentBlock?.start_monday_date ?? 'block'}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
   const generateScheduleWithLovable = () => runAISchedule('lovable');
 
   // Import ChatGPT schedule
@@ -607,7 +628,7 @@ const AdminDashboard = () => {
 
   const manualCleanup = async () => {
     if (!currentBlock) return;
-    if (!window.confirm('This deletes unfinished requests from older blocks. Requests for the current block are kept. Continue?')) return;
+    if (!(await confirm({ title: 'Clean old data?', description: 'This deletes unfinished requests from older blocks. Requests for the current block are kept.', confirmLabel: 'Delete' }))) return;
     setCleaningUp(true);
     try {
       await cleanupOldData(currentBlock.id);
@@ -636,7 +657,7 @@ const AdminDashboard = () => {
       body: { blockId: currentBlock.id, countOnly: true }
     });
     const n = countData?.count ?? 0;
-    if (!window.confirm(`This removes ${n > 0 ? n : 'all'} events for this block from the shared Google calendars. Continue?`)) return;
+    if (!(await confirm({ title: 'Unpublish schedule?', description: `This removes ${n > 0 ? n : 'all'} events for this block from the shared Google calendars.`, confirmLabel: 'Unpublish' }))) return;
 
     setUnpublishing(true);
     setUnpublishStatus(null);
@@ -685,6 +706,7 @@ const AdminDashboard = () => {
 
   // Send mass email with schedule details
   const sendMassEmail = async () => {
+    if (!(await confirm({ title: 'Email all doctors?', description: 'This emails the published schedule to every active doctor.', confirmLabel: 'Send' }))) return;
     if (!currentBlock || currentBlock.status !== 'published') {
       toast({
         title: "Cannot Send Emails",
@@ -1161,7 +1183,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
       });
       return;
     }
-    setSaving(true);
+    setSavingDoctor(true);
     try {
       if (editingDoctor) {
         // Update existing doctor
@@ -1205,11 +1227,11 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
         variant: "destructive"
       });
     } finally {
-      setSaving(false);
+      setSavingDoctor(false);
     }
   };
   const toggleDoctorActive = async (doctor: any) => {
-    setSaving(true);
+    setSavingDoctor(true);
     try {
       const {
         error
@@ -1230,7 +1252,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
         variant: "destructive"
       });
     } finally {
-      setSaving(false);
+      setSavingDoctor(false);
     }
   };
 
@@ -1562,7 +1584,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
   };
   const saveEditedRequest = async () => {
     if (!editingRequest) return;
-    setSaving(true);
+    setSavingRequest(true);
     try {
       if (editingRequest.isNew) {
         // Creating a new request
@@ -1608,7 +1630,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
         variant: "destructive"
       });
     } finally {
-      setSaving(false);
+      setSavingRequest(false);
     }
   };
   const removeUnavailableDate = (dateToRemove: Date) => {
@@ -1690,8 +1712,8 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
           </div>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full lg:w-fit grid-cols-5 lg:grid-cols-5">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="flex w-full lg:w-fit overflow-x-auto justify-start">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="configure">Configure</TabsTrigger>
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
@@ -1723,12 +1745,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                             {allSubmitted ? "All active doctors have submitted their preferences. You can now generate the schedule." : `${submittedCount} of ${totalDoctors} doctors have submitted their requests.`}
                           </AlertDescription>
                         </div>
-                        {allSubmitted && <Button className="bg-success hover:bg-success/90 text-success-foreground" onClick={() => {
-                      toast({
-                        title: "Ready to Generate Schedule",
-                        description: "All doctors have submitted. You can now create the final schedule."
-                      });
-                    }}>
+                        {allSubmitted && <Button className="bg-success hover:bg-success/90 text-success-foreground" onClick={() => setActiveTab("schedule")}>
                             Generate Schedule
                           </Button>}
                       </div>
@@ -1841,9 +1858,9 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                          </TableHeader>
                         <TableBody>
                           {doctorStatuses.map(doctor => <React.Fragment key={doctor.email}>
-                              <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => toggleRowExpansion(doctor.email)}>
+                              <TableRow className="cursor-pointer hover:bg-muted/50" role="button" tabIndex={0} aria-expanded={expandedRows.has(doctor.email)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleRowExpansion(doctor.email); } }} onClick={() => toggleRowExpansion(doctor.email)}>
                                 <TableCell>
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" tabIndex={-1} aria-hidden="true">
                                     {expandedRows.has(doctor.email) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                   </Button>
                                 </TableCell>
@@ -1964,7 +1981,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                           <SelectContent>
                             <SelectItem value="collecting">Collecting</SelectItem>
                             <SelectItem value="closed">Closed</SelectItem>
-                            <SelectItem value="published">Published</SelectItem>
+                            {currentBlock.status === 'published' && <SelectItem value="published" disabled>Published (use Publish tab)</SelectItem>}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1992,23 +2009,23 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
           {/* Schedule Tab */}
           <TabsContent value="schedule" className="space-y-6">
             {currentBlock ? <>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h2 className="text-2xl font-bold">AI Schedule Generation</h2>
                     
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button 
                       onClick={generateScheduleWithLovable} 
-                      disabled={generatingWithLovable || saving} 
+                      disabled={generatingWithLovable || generatingDeepseek} 
                       className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
                     >
                       <Sparkles className="h-4 w-4 mr-2" />
                       {generatingWithLovable ? "Generating..." : "Generate with Lovable AI"}
                     </Button>
-                    <Button onClick={generateSchedule} disabled={saving || generatingWithLovable} variant="outline">
+                    <Button onClick={generateSchedule} disabled={generatingDeepseek || generatingWithLovable} variant="outline">
                       <Play className="h-4 w-4 mr-2" />
-                       {saving ? "Generating..." : "Generate (DeepSeek)"}
+                       {generatingDeepseek ? "Generating..." : "Generate (DeepSeek)"}
                     </Button>
                     <Button 
                       variant="outline" 
@@ -2018,7 +2035,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       <Upload className="h-4 w-4 mr-2" />
                       Import ChatGPT
                     </Button>
-                    <Button variant="outline" disabled={assignments.length === 0}>
+                    <Button variant="outline" disabled={assignments.length === 0} onClick={exportCsv}>
                       <Download className="h-4 w-4 mr-2" />
                       Export CSV
                     </Button>
@@ -2052,15 +2069,15 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                         <div className="flex gap-2 justify-center">
                           <Button 
                             onClick={generateScheduleWithLovable} 
-                            disabled={generatingWithLovable || saving}
+                            disabled={generatingWithLovable || generatingDeepseek}
                             className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
                           >
                             <Sparkles className="h-4 w-4 mr-2" />
                             {generatingWithLovable ? "Generating..." : "Generate with Lovable AI"}
                           </Button>
-                          <Button onClick={generateSchedule} disabled={saving || generatingWithLovable} variant="outline">
+                          <Button onClick={generateSchedule} disabled={generatingDeepseek || generatingWithLovable} variant="outline">
                             <Play className="h-4 w-4 mr-2" />
-                            {saving ? "Generating..." : "Generate (DeepSeek)"}
+                            {generatingDeepseek ? "Generating..." : "Generate (DeepSeek)"}
                           </Button>
                         </div>
                      </CardContent>
@@ -2149,10 +2166,10 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={() => openDoctorDialog(doctor)}>
+                            <Button variant="outline" size="sm" onClick={() => openDoctorDialog(doctor)} aria-label={`Edit ${doctor.name}`}>
                               <Edit className="h-3 w-3" />
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => toggleDoctorActive(doctor)} disabled={saving}>
+                            <Button variant="outline" size="sm" onClick={() => toggleDoctorActive(doctor)} disabled={savingDoctor} aria-label={doctor.active ? `Deactivate ${doctor.name}` : `Activate ${doctor.name}`}>
                               {doctor.active ? <X className="h-3 w-3" /> : <CheckCircle className="h-3 w-3" />}
                             </Button>
                           </div>
@@ -2188,7 +2205,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     })} placeholder="doctor@example.com" />
                   </div>
                   <div>
-                    <Label htmlFor="doctor-mobile">AI Scheduling Prompt</Label>
+                    <Label htmlFor="doctor-mobile">Mobile number</Label>
                     <Input id="doctor-mobile" value={doctorForm.mobile} onChange={e => setDoctorForm({
                       ...doctorForm,
                       mobile: e.target.value
@@ -2206,8 +2223,8 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                   <Button variant="outline" onClick={closeDoctorDialog}>
                     Cancel
                   </Button>
-                  <Button onClick={saveDoctor} disabled={saving}>
-                    {saving ? "Saving..." : editingDoctor ? "Update" : "Add"} Doctor
+                  <Button onClick={saveDoctor} disabled={savingDoctor}>
+                    {savingDoctor ? "Saving..." : editingDoctor ? "Update" : "Add"} Doctor
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -2277,7 +2294,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                     </div>
                   )}
 
-                  <div className="flex gap-4 flex-wrap">
+                  <div className="flex gap-2 flex-wrap">
                     
                     <Button onClick={manualCleanup} disabled={cleaningUp} variant="outline" size="sm" className="text-orange-600 border-orange-600 hover:bg-orange-50">
                       {cleaningUp ? "Cleaning..." : "Clean Old Data"}
@@ -2382,7 +2399,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" onSelect={addUnavailableDate} initialFocus className={cn("p-3 pointer-events-auto")} />
+                      <Calendar mode="single" onSelect={addUnavailableDate} defaultMonth={currentBlock ? parseLocalDate(currentBlock.start_monday_date) : undefined} disabled={currentBlock ? [{ before: parseLocalDate(currentBlock.start_monday_date) }, { after: parseLocalDate(currentBlock.end_sunday_date) }] : undefined} initialFocus className={cn("p-3 pointer-events-auto")} />
                     </PopoverContent>
                   </Popover>
                 </div>
@@ -2401,7 +2418,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                   const sundayOfWeek = addDays(fridayOfWeek, 2);
                   return `${format(fridayOfWeek, 'MMM d')}-${format(sundayOfWeek, 'd')}`;
                 })() : '';
-                return <div key={weekNum} className={cn("p-2 border rounded cursor-pointer transition-colors", isSelected ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50")} onClick={() => {
+                return <button type="button" aria-pressed={isSelected} key={weekNum} className={cn("p-2 border rounded cursor-pointer transition-colors text-left", isSelected ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50")} onClick={() => {
                   if (isSelected) {
                     setEditRequestForm({
                       ...editRequestForm,
@@ -2416,7 +2433,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                 }}>
                       <div className="text-sm font-medium">Week {weekNum}</div>
                       <div className="text-xs text-muted-foreground">{weekEndDates}</div>
-                    </div>;
+                    </button>;
               })}
               </div>
             </div>
@@ -2434,8 +2451,8 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
             <Button variant="outline" onClick={closeEditRequestDialog}>
               Cancel
             </Button>
-            <Button onClick={saveEditedRequest} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
+            <Button onClick={saveEditedRequest} disabled={savingRequest}>
+              {savingRequest ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2491,6 +2508,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </ProtectedRoute>;
 };
 export default AdminDashboard;
