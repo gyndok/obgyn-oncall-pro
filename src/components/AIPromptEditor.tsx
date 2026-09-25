@@ -67,45 +67,24 @@ export const AIPromptEditor = () => {
   };
 
   const resetToDefault = async () => {
-    const defaultPrompt = `You are an expert medical scheduling AI. You must respond with a valid JSON object containing a complete 7-week call schedule.
+    const defaultPrompt = `You are an expert medical call-scheduling AI.
 
-RESPONSE FORMAT (REQUIRED):
-{
-  "schedule": [
-    {
-      "date": "2025-11-03",
-      "doctor_name": "Klein",
-      "is_weekend": false,
-      "weekday_name": "Mon",
-      "week_index": 1
-    },
-    ...
-  ],
-  "summary": {
-    "total_assignments": 49,
-    "weekend_assignments": 21,
-    "weekday_assignments": 28,
-    "violations": []
-  }
-}
+Build an on-call schedule of {{weeks}} weeks ({{days}} consecutive days) starting Monday {{start_date}}.
 
-CRITICAL CONSTRAINTS:
-- Generate exactly 49 assignments (7 weeks × 7 days)
-- Week_index must be 1-7
-- Each doctor gets exactly one weekend bundle (Fri+Sat+Sun)
-- Each doctor gets exactly 4 weekdays (Mon-Thu)
-- LeBlanc never gets Tuesday
+Doctors (use these exact last names): {{doctors}}
 
-JOHNSON-CLINGER MONDAY RULE (ABSOLUTE):
-- Dr. Clinger ALWAYS takes the Monday after Johnson's weekend (Fri+Sat+Sun)
-- Dr. Johnson ALWAYS takes the Monday after Clinger's weekend (Fri+Sat+Sun)
-- BLOCKING RULE: If Johnson has requested off a Monday, then Clinger CANNOT have the weekend (Fri+Sat+Sun) immediately before that Monday, even if Clinger requested that weekend
-- BLOCKING RULE: If Clinger has requested off a Monday, then Johnson CANNOT have the weekend (Fri+Sat+Sun) immediately before that Monday, even if Johnson requested that weekend
+Time off (hard excludes):
+{{time_off}}
 
-- Use exact doctor names: Klein, LeBlanc, Johnson, Kenney, LaBerge, Clinger, Demerson
-- Use abbreviated weekday names: Mon, Tue, Wed, Thu, Fri, Sat, Sun
-- Dates must be in YYYY-MM-DD format
-- Respond ONLY with valid JSON, no other text`;
+HARD RULES:
+- Exactly one doctor per day, every day in the range.
+- Each doctor gets exactly one weekend bundle (Fri+Sat+Sun of the same week).
+- A doctor cannot take the Thursday before or the Monday after their own weekend.
+- Spread Mon-Thu days evenly; at most one Mon-Thu day per doctor per week.
+- LeBlanc never gets Tuesday.
+- Never assign a doctor on a time-off date.
+
+Respond ONLY with JSON: {"schedule":[{"date":"YYYY-MM-DD","doctor_name":"LastName"}]}`;
 
     setPrompt(defaultPrompt);
   };
