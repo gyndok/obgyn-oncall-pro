@@ -379,21 +379,6 @@ const DoctorPortal = () => {
       </ProtectedRoute>;
   }
   return <ProtectedRoute>
-        <div className="min-h-screen bg-background p-4">
-          <div className="container mx-auto max-w-4xl">
-            <div className="text-center py-16">
-              <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-2xl font-bold mb-2">No Active Call Block</h2>
-              <p className="text-muted-foreground">
-                There are currently no active call blocks available for submission.
-                Please check back later or contact your administrator.
-              </p>
-            </div>
-          </div>
-        </div>
-      </ProtectedRoute>;
-  }
-  return <ProtectedRoute>
       <div className="min-h-screen bg-background">
         <div className="container mx-auto max-w-6xl p-6">
           {/* Header */}
