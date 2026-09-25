@@ -783,46 +783,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const testCalendar = async () => {
-    if (!user) return;
-    
-    setTestingCalendar(true);
-    setTestStatus(null);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('test-calendar-event', {
-        body: { userId: user.id }
-      });
-      
-      if (error) throw error;
-      
-      if (data.success) {
-        setTestStatus({
-          type: 'success',
-          message: `Test event created! Check the Staffing Calendar at ${data.eventTime}`
-        });
-        toast({
-          title: "Success",
-          description: "Test event created successfully in Staffing Calendar"
-        });
-      } else {
-        throw new Error(data.error || 'Test failed');
-      }
-    } catch (error) {
-      console.error('Error testing calendar:', error);
-      setTestStatus({
-        type: 'error',
-        message: `Test failed: ${error.message}`
-      });
-      toast({
-        title: "Error",
-        description: "Failed to create test event",
-        variant: "destructive"
-      });
-    } finally {
-      setTestingCalendar(false);
-    }
-  };
 
   const unpublishSchedule = async () => {
     if (!currentBlock || !user) return;
@@ -2460,9 +2420,6 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                   )}
 
                   <div className="flex gap-4 flex-wrap">
-                    <Button onClick={testCalendar} disabled={testingCalendar} variant="outline" size="sm">
-                      {testingCalendar ? "Testing..." : "Test Calendar"}
-                    </Button>
                     
                     <Button onClick={manualCleanup} disabled={cleaningUp} variant="outline" size="sm" className="text-orange-600 border-orange-600 hover:bg-orange-50">
                       {cleaningUp ? "Cleaning..." : "Clean Old Data"}
