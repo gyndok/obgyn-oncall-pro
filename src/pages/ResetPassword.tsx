@@ -145,7 +145,7 @@ const ResetPassword = () => {
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input 
                     id="password" 
-                    type="password" 
+                    type="password" autoComplete="new-password" 
                     placeholder="Enter new password (min. 6 characters)" 
                     value={password} 
                     onChange={e => setPassword(e.target.value)} 
@@ -160,7 +160,7 @@ const ResetPassword = () => {
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input 
                     id="confirm-password" 
-                    type="password" 
+                    type="password" autoComplete="new-password" 
                     placeholder="Confirm new password" 
                     value={confirmPassword} 
                     onChange={e => setConfirmPassword(e.target.value)} 
