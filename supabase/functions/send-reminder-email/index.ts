@@ -30,7 +30,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending reminder email to ${doctorName} (${doctorEmail})`);
 
     const emailResponse = await resend.emails.send({
-      from: "Call Schedule <onboarding@resend.dev>", // You'll need to update this with your domain
+      from: "Call Schedule <schedule@geffreyklein.com>",
       to: [doctorEmail],
       subject: `Reminder: Submit Your Call Schedule Preferences - ${blockTitle}`,
       html: `
