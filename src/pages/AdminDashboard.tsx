@@ -287,17 +287,18 @@ const AdminDashboard = () => {
       const endDate = addDays(addWeeks(startDate, weekCount), -1); // N weeks, ending on Sunday
 
       const {
+        data: newBlock,
         error
       } = await supabase.from('blocks').insert({
         start_monday_date: format(startDate, 'yyyy-MM-dd'),
         end_sunday_date: format(endDate, 'yyyy-MM-dd'),
         deadline: newBlockDeadline ? new Date(newBlockDeadline).toISOString() : null,
         status: 'collecting'
-      });
+      }).select('id').single();
       if (error) throw error;
       
       // Clean up old doctor requests from previous blocks to avoid confusion
-      await cleanupOldData();
+      await cleanupOldData(newBlock.id);
       
       toast({
         title: "Success",
@@ -589,28 +590,27 @@ const AdminDashboard = () => {
     }
   };
 
-  const cleanupOldData = async () => {
-    try {
+  const cleanupOldData = async (keepBlockId: string) => {
+    {
       // Delete doctor requests from blocks that are not the current active block
       // Keep published blocks' data but remove collecting/closed blocks that are old
       const { error } = await supabase
         .from('doctor_requests')
         .delete()
-        .not('block_id', 'eq', currentBlock?.id || '')
+        .neq('block_id', keepBlockId)
         .in('status', ['not_started', 'in_progress']);
       
       if (error) throw error;
       
-      console.log('Cleaned up old doctor requests');
-    } catch (error) {
-      console.error('Error cleaning up old data:', error);
     }
   };
 
   const manualCleanup = async () => {
+    if (!currentBlock) return;
+    if (!window.confirm('This deletes unfinished requests from older blocks. Requests for the current block are kept. Continue?')) return;
     setCleaningUp(true);
     try {
-      await cleanupOldData();
+      await cleanupOldData(currentBlock.id);
       await fetchData(); // Refresh the data
       toast({
         title: "Success",
@@ -1244,10 +1244,13 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
         progressPercent: 0
       };
     }
-    const submittedCount = doctorRequests.filter(req => req.status === 'submitted').length;
-    const inProgressCount = doctorRequests.filter(req => req.status === 'in_progress').length;
-    const notStartedCount = doctors.length - doctorRequests.length;
-    const progressPercent = doctors.length > 0 ? submittedCount / doctors.length * 100 : 0;
+    const active = doctors.filter(d => d.active);
+    const activeIds = new Set(active.map(d => d.id));
+    const blockReqs = doctorRequests.filter(req => activeIds.has(req.doctor_id) && (!currentBlock || req.block_id === currentBlock.id));
+    const submittedCount = blockReqs.filter(req => req.status === 'submitted').length;
+    const inProgressCount = blockReqs.filter(req => req.status === 'in_progress').length;
+    const notStartedCount = active.length - submittedCount - inProgressCount;
+    const progressPercent = active.length > 0 ? submittedCount / active.length * 100 : 0;
     return {
       submittedCount,
       inProgressCount,
@@ -1275,9 +1278,9 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     switch (status) {
       case 'submitted':
         return <Badge className="bg-success text-success-foreground"><CheckCircle className="h-3 w-3 mr-1" />Submitted</Badge>;
-      case 'in-progress':
+      case 'in_progress':
         return <Badge variant="outline" className="border-warning text-warning"><Clock className="h-3 w-3 mr-1" />In Progress</Badge>;
-      case 'not-started':
+      case 'not_started':
         return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Not Started</Badge>;
       default:
         return null;
@@ -1742,7 +1745,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-primary">{submissionStats.submittedCount}/{doctors.length}</div>
+                      <div className="text-2xl font-bold text-primary">{submissionStats.submittedCount}/{doctors.filter(d => d.active).length}</div>
                       <Progress value={submissionStats.progressPercent} className="mt-2" />
                     </CardContent>
                   </Card>

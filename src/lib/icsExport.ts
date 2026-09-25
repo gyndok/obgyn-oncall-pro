@@ -37,6 +37,7 @@ export function generateIcsContent(
     a.date.localeCompare(b.date)
   );
 
+  const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
   for (const assignment of sortedAssignments) {
     // Get doctor name from joined data or lookup from map
     const doctorName = assignment.doctors?.name || doctorMap.get(assignment.doctor_id) || 'Unknown';
@@ -50,11 +51,11 @@ export function generateIcsContent(
     const endDateStr = format(endDate, 'yyyyMMdd');
     
     // Generate a unique ID for the event
-    const uid = `${assignment.date}-${assignment.doctor_id}@oncall.schedule`;
+    const uid = `${blockStartDate}-${assignment.date}@oncall.schedule`;
     
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:${uid}`);
-    lines.push(`DTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss'Z'")}`);
+    lines.push(`DTSTAMP:${dtstamp}`);
     lines.push(`DTSTART;VALUE=DATE:${dateStr}`);
     lines.push(`DTEND;VALUE=DATE:${endDateStr}`);
     lines.push(`SUMMARY:${escapeIcsText(doctorName)}`);
@@ -64,7 +65,7 @@ export function generateIcsContent(
 
   lines.push('END:VCALENDAR');
   
-  return lines.join('\r\n');
+  return lines.join('\r\n') + '\r\n';
 }
 
 // Escape special characters in ICS text fields

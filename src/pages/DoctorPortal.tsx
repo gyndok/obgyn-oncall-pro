@@ -64,7 +64,7 @@ const getHolidays = (year: number) => {
 
   // Labor Day (first Monday in September)
   const laborDay = new Date(year, 8, 1);
-  laborDay.setDate(1 + (7 - laborDay.getDay()) % 7);
+  laborDay.setDate(1 + (8 - laborDay.getDay()) % 7);
   holidays.push({
     date: laborDay,
     name: "Labor Day"
@@ -766,7 +766,8 @@ const DoctorPortal = () => {
                           }
 
                           // Check if this event contains the current doctor's name
-                          const isCurrentDoctor = eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[0]) || eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[1]);
+                          const myLast = doctorName ? doctorName.replace(/^Dr\.?\s+/i, '').trim().split(/\s+/).pop() || '' : '';
+                          const isCurrentDoctor = !!myLast && myLast.length > 1 && new RegExp(`\\b${myLast.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(eventTitle);
                           if (isCurrentDoctor) {
                             // Current doctor's events - use bright, distinctive colors
                             if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {

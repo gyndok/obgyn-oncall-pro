@@ -55,7 +55,7 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
       
       const week = weekMap.get(weekIndex);
       const dayKey = assignment.weekday_name.toLowerCase(); // Convert 'Mon' to 'mon', etc.
-      week.assignments[dayKey] = assignment.doctors.name;
+      week.assignments[dayKey] = assignment.doctors?.name ?? 'Unknown';
       week.dayDates[dayKey] = assignment.date;
     });
     
@@ -86,7 +86,7 @@ const ScheduleVisualization = ({ assignments, block }: ScheduleVisualizationProp
     const summary = new Map();
     
     assignments.forEach(assignment => {
-      const doctorName = assignment.doctors.name;
+      const doctorName = assignment.doctors?.name ?? 'Unknown';
       if (!summary.has(doctorName)) {
         summary.set(doctorName, {
           name: doctorName,
