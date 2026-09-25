@@ -462,6 +462,11 @@ const DoctorPortal = () => {
 
             {/* Preferences Tab */}
             <TabsContent value="preferences" className="space-dashboard">
+              {!currentBlock ? <Card className="card-stats"><CardContent className="py-12 text-center">
+                  <CalendarIcon className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-lg font-medium">No request period is open right now.</p>
+                  <p className="text-muted-foreground">Check back later or contact the scheduler.</p>
+                </CardContent></Card> : <>
               <div className="grid lg:grid-cols-2 gap-6">
                 {/* Unavailable Dates */}
                 <Card className="card-stats hover-lift">
@@ -641,6 +646,7 @@ const DoctorPortal = () => {
                   {saving ? "Submitting..." : isSubmitted ? "Update Submission" : "Submit Preferences"}
                 </Button>
               </div>
+              </>}
             </TabsContent>
 
             {/* Team Status Tab */}
