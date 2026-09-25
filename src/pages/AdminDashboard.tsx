@@ -2433,7 +2433,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                 }}>
                       <div className="text-sm font-medium">Week {weekNum}</div>
                       <div className="text-xs text-muted-foreground">{weekEndDates}</div>
-                    </div>;
+                    </button>;
               })}
               </div>
             </div>
