@@ -41,9 +41,11 @@ Deno.serve(async (req) => {
       const text = await res.text().catch(() => "");
       let message = "AI request failed.";
       try { message = JSON.parse(text)?.error?.message ?? JSON.parse(text)?.message ?? message; } catch { /* ignore */ }
-      if (res.status === 402) message = message || "Out of AI credits.";
+      if (res.status === 402) message = "Out of AI credits.";
       if (res.status === 429) message = "AI is busy right now — try again in a minute.";
-      return jsonResponse({ error: message }, res.status);
+      // Upstream auth errors shouldn't look like the admin's own sign-in failing
+      const status = res.status === 401 || res.status === 403 ? 502 : res.status;
+      return jsonResponse({ error: message }, status);
     }
 
     // Consume SSE, accumulate output text
