@@ -17,8 +17,8 @@ const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps)
     }
   }, [user, loading, navigate]);
 
-  // Show loading while checking authentication
-  if (loading) {
+  // Show loading only until we have a user (never re-cover an already loaded page)
+  if (loading && !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 flex items-center justify-center">
         <div className="text-center">
