@@ -23,7 +23,7 @@ import { GoogleCalendarConnect } from "@/components/GoogleCalendarConnect";
 import { AIPromptEditor } from "@/components/AIPromptEditor";
 import { supabase } from "@/integrations/supabase/client";
 import { validateAssignments, type RawAssignment } from "@/lib/schedule/validateAssignments";
-import { format, addDays, addWeeks } from "date-fns";
+import { format, addDays, addWeeks, differenceInCalendarDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
@@ -864,6 +864,38 @@ const AdminDashboard = () => {
   };
 
   // Generate AI prompt based on doctor requests and preferences
+  const requestsWithData = () => doctorRequests.filter(req =>
+    currentBlock && req.block_id === currentBlock.id && (
+      (Array.isArray(req.unavailable_dates) && req.unavailable_dates.length > 0) ||
+      (Array.isArray(req.preferred_weekends) && req.preferred_weekends.length > 0) ||
+      (req.notes && String(req.notes).trim()) ||
+      req.status === 'submitted'
+    ));
+
+  const getPromptVars = (): Record<string, string> => {
+    if (!currentBlock) return {};
+    const start = parseLocalDate(currentBlock.start_monday_date);
+    const end = parseLocalDate(currentBlock.end_sunday_date);
+    const days = differenceInCalendarDays(end, start) + 1;
+    const active = doctors.filter(d => d.active);
+    const lastName = (n: string) => { const p = n.replace(/^Dr\.?\s+/i, '').trim().split(/\s+/); return p[p.length - 1]; };
+    const timeOff = requestsWithData()
+      .map(r => {
+        const d = doctors.find(x => x.id === r.doctor_id);
+        const dates = Array.isArray(r.unavailable_dates) ? r.unavailable_dates : [];
+        return d && dates.length ? `${lastName(d.name)}: ${dates.join(', ')}` : null;
+      })
+      .filter(Boolean)
+      .join('\n');
+    return {
+      doctors: active.map(d => lastName(d.name)).join(', '),
+      weeks: String(Math.round(days / 7)),
+      days: String(days),
+      start_date: format(start, 'yyyy-MM-dd'),
+      time_off: timeOff || 'None',
+    };
+  };
+
   const generateAIPrompt = () => {
     if (!currentBlock) return "No active block available.";
     const blockStart = parseLocalDate(currentBlock.start_monday_date);
@@ -871,8 +903,8 @@ const AdminDashboard = () => {
     
     const activeDoctors = doctors.filter(d => d.active);
     const doctorCount = activeDoctors.length;
-    const weekCount = doctorCount;
-    const totalDays = weekCount * 7;
+    const totalDays = differenceInCalendarDays(blockEnd, blockStart) + 1;
+    const weekCount = Math.round(totalDays / 7);
     const weekdaysPerDoctor = weekCount - 3; // Each doctor gets (N-3) weekdays (total weekdays = N*4, each doctor gets 4... actually N weeks * 4 weekdays = 4N, divided by N doctors = 4)
     // Actually: N weeks, 4 weekdays per week = 4N weekdays total, N doctors each get 1 weekend (3 days) leaving 4N weekdays / N = 4 per doctor
     const weekdayCount = 4; // Always 4 weekdays per doctor regardless of rotation size
@@ -885,7 +917,7 @@ const AdminDashboard = () => {
     const doctorNamesStr = doctorNames.join(', ');
 
     // Get submitted requests
-    const submittedRequests = doctorRequests.filter(req => req.status === 'submitted');
+    const submittedRequests = requestsWithData();
     let prompt = `**Role:** You are a medical call-scheduling AI. Generate an optimal ${weekCount}-week on-call schedule for ${doctorCount} doctors.
 
 **Schedule Period**
@@ -968,45 +1000,11 @@ C) **Even distribution per week:** Avoid stacking many different doctors' weekda
     prompt += `
 
 **Output Requirements**
-Provide both human-readable and machine-readable outputs.
+Respond with JSON only — no other text — in exactly this shape, one entry per day (${totalDays} entries):
 
-1. **Readable schedule (by week):**
+{"schedule":[{"date":"YYYY-MM-DD","doctor_name":"${doctorNames[0] || 'LastName'}"}]}
 
-   * Week N (Mon–Sun with dates):
-     Mon, YYYY-MM-DD — {Doctor}
-     Tue, YYYY-MM-DD — {Doctor}
-     Wed, YYYY-MM-DD — {Doctor}
-     Thu, YYYY-MM-DD — {Doctor}
-     Fri, YYYY-MM-DD — {Doctor}  (Weekend Bundle if Fri)
-     Sat, YYYY-MM-DD — {Doctor}  (Weekend Bundle if Sat)
-     Sun, YYYY-MM-DD — {Doctor}  (Weekend Bundle if Sun)
-
-2. **Per-doctor summary:**
-
-   * {Doctor}: Weekend = Week # (Fri/Sat/Sun dates), Weekdays = [Week#/Day, …] (total must equal ${weekdayCount})
-
-3. **JSON payload (strict schema):**
-
-\`\`\`json
-{
-  "block": {
-    "start_monday": "${format(blockStart, 'yyyy-MM-dd')}",
-    "end_sunday": "${format(blockEnd, 'yyyy-MM-dd')}"
-  },
-  "assignments": [
-    {"date": "YYYY-MM-DD", "weekday": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "doctor": "${doctorNames.join('|')}", "is_weekend": true|false, "week_index": 1}
-    // ${totalDays} records total
-  ],
-  "doctor_summaries": [
-    {"doctor": "${doctorNames[0] || 'Name'}", "weekend_week_index": 3, "weekend_dates": ["YYYY-MM-DD","YYYY-MM-DD","YYYY-MM-DD"], "weekday_dates": ["YYYY-MM-DD", "YYYY-MM-DD", "YYYY-MM-DD", "YYYY-MM-DD"]}
-    // one per doctor
-  ],
-  "validation": {
-    "hard_constraints_passed": true,
-    "errors": []
-  }
-}
-\`\`\`
+doctor_name must be one of: ${doctorNamesStr}
 
 **Validator (run before returning output)**
 Confirm all of the following are true; otherwise set \`hard_constraints_passed=false\` and list each violation in \`errors\`:
@@ -1031,8 +1029,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
 
 **Failure / Infeasibility Behavior**
 
-* If infeasible under the hard constraints, do **not** relax them.
-* Return an **Infeasibility Report** listing the minimal conflicting elements.
+* If infeasible under the hard constraints, do **not** relax them; return {"schedule":[]}.
 
 **Formatting Notes**
 
