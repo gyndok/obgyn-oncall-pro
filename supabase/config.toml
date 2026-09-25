@@ -10,5 +10,6 @@ verify_jwt = true
 [functions.send-schedule-email]
 verify_jwt = true
 
-[functions.generate-ai-schedule-lovable]
+
+[functions.generate-ai-schedule]
 verify_jwt = true
