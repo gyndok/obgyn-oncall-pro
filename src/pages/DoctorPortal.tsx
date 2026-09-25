@@ -64,7 +64,7 @@ const getHolidays = (year: number) => {
 
   // Labor Day (first Monday in September)
   const laborDay = new Date(year, 8, 1);
-  laborDay.setDate(1 + (7 - laborDay.getDay()) % 7);
+  laborDay.setDate(1 + (8 - laborDay.getDay()) % 7);
   holidays.push({
     date: laborDay,
     name: "Labor Day"
@@ -113,8 +113,10 @@ const DoctorPortal = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   // Fetch calendar events
+  const calendarRequestId = React.useRef(0);
   const fetchCalendarEvents = async () => {
     if (!user?.email) return;
+    const requestId = ++calendarRequestId.current;
     setCalendarLoading(true);
     try {
       // Configure your actual calendar IDs
@@ -138,6 +140,7 @@ const DoctorPortal = () => {
           userEmail: user.email
         }
       });
+      if (requestId !== calendarRequestId.current) return;
       if (error) {
         console.error('Error fetching calendar events:', error);
         toast({
@@ -157,7 +160,7 @@ const DoctorPortal = () => {
         variant: "destructive"
       });
     } finally {
-      setCalendarLoading(false);
+      if (requestId === calendarRequestId.current) setCalendarLoading(false);
     }
   };
 
@@ -766,7 +769,8 @@ const DoctorPortal = () => {
                           }
 
                           // Check if this event contains the current doctor's name
-                          const isCurrentDoctor = eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[0]) || eventTitle.toLowerCase().includes(doctorName.toLowerCase().split(' ')[1]);
+                          const myLast = doctorName ? doctorName.replace(/^Dr\.?\s+/i, '').trim().split(/\s+/).pop() || '' : '';
+                          const isCurrentDoctor = !!myLast && myLast.length > 1 && new RegExp(`\\b${myLast.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(eventTitle);
                           if (isCurrentDoctor) {
                             // Current doctor's events - use bright, distinctive colors
                             if (calendarId === "odn75bvuc02onjrb0ai9oskbc4@group.calendar.google.com") {

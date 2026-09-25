@@ -23,7 +23,7 @@ import { GoogleCalendarConnect } from "@/components/GoogleCalendarConnect";
 import { AIPromptEditor } from "@/components/AIPromptEditor";
 import { supabase } from "@/integrations/supabase/client";
 import { validateAssignments, type RawAssignment } from "@/lib/schedule/validateAssignments";
-import { format, addDays, addWeeks } from "date-fns";
+import { format, addDays, addWeeks, differenceInCalendarDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
@@ -287,17 +287,18 @@ const AdminDashboard = () => {
       const endDate = addDays(addWeeks(startDate, weekCount), -1); // N weeks, ending on Sunday
 
       const {
+        data: newBlock,
         error
       } = await supabase.from('blocks').insert({
         start_monday_date: format(startDate, 'yyyy-MM-dd'),
         end_sunday_date: format(endDate, 'yyyy-MM-dd'),
         deadline: newBlockDeadline ? new Date(newBlockDeadline).toISOString() : null,
         status: 'collecting'
-      });
+      }).select('id').single();
       if (error) throw error;
       
       // Clean up old doctor requests from previous blocks to avoid confusion
-      await cleanupOldData();
+      await cleanupOldData(newBlock.id);
       
       toast({
         title: "Success",
@@ -366,125 +367,46 @@ const AdminDashboard = () => {
     return (data as number) ?? rows.length;
   };
 
-  const generateSchedule = async () => {
+  const runAISchedule = async (provider: 'deepseek' | 'lovable') => {
     if (!currentBlock) return;
-    setSaving(true);
+    const setBusy = provider === 'lovable' ? setGeneratingWithLovable : setSaving;
+    setBusy(true);
     try {
-      console.log('🤖 Generating AI-powered schedule with DeepSeek...');
-
-      // Generate the AI prompt with all doctor preferences
-      const aiPrompt = generateAIPrompt();
-
-      // Prepare doctor data for the AI function
-      const doctorData = doctors.filter(d => d.active !== false).map(doctor => ({
-        id: doctor.id,
-        name: doctor.name
-      }));
-
-      // Call the AI scheduling edge function
+      const doctorData = doctors.filter(d => d.active !== false).map(d => ({ id: d.id, name: d.name }));
       const response = await supabase.functions.invoke('generate-ai-schedule', {
-        body: {
-          prompt: aiPrompt,
-          blockStartDate: currentBlock.start_monday_date,
-          doctors: doctorData
-        }
+        body: { provider, prompt: generateAIPrompt(), doctors: doctorData, vars: getPromptVars() }
       });
       if (response.error) {
-        console.error('AI scheduling error:', response.error);
-        throw new Error(response.error.message || 'Failed to generate AI schedule');
+        let msg = response.error.message || 'Failed to generate AI schedule';
+        try {
+          const ctx = await (response.error as any).context?.json?.();
+          if (ctx?.error) msg = ctx.error;
+        } catch { /* ignore */ }
+        throw new Error(msg);
       }
-      const {
-        assignments: aiAssignments,
-        summary
-      } = response.data;
-      if (!aiAssignments || aiAssignments.length === 0) {
-        throw new Error('AI returned no assignments');
-      }
-      console.log(`📋 AI generated ${aiAssignments.length} assignments`);
-      if (summary) {
-        console.log('📊 Schedule summary:', summary);
-      }
-
-      await saveValidatedSchedule(aiAssignments.map((a: any) => ({ date: a.date, doctor_id: a.doctor_id, doctor_name: a.doctor_name })));
+      const aiAssignments = response.data?.assignments;
+      if (!aiAssignments || aiAssignments.length === 0) throw new Error('AI returned no assignments');
+      const saved = await saveValidatedSchedule(aiAssignments.map((a: any) => ({ date: a.date, doctor_id: a.doctor_id, doctor_name: a.doctor_name })));
+      if (saved === undefined || saved === null) return;
       toast({
-        title: "AI Schedule Generated Successfully! 🤖",
-        description: `Created ${aiAssignments.length} assignments using DeepSeek AI with doctor preferences`
+        title: "AI Schedule Generated",
+        description: `Created ${aiAssignments.length} assignments using ${provider === 'lovable' ? 'Lovable AI' : 'DeepSeek'}`
       });
       fetchData();
     } catch (error: any) {
       console.error('Error generating AI schedule:', error);
       toast({
         title: "AI Schedule Generation Failed",
-        description: error.message || "Failed to generate schedule. Check console for details.",
+        description: error.message || "Failed to generate schedule.",
         variant: "destructive"
       });
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   };
+  const generateSchedule = () => runAISchedule('deepseek');
+  const generateScheduleWithLovable = () => runAISchedule('lovable');
 
-  const generateScheduleWithLovable = async () => {
-    if (!currentBlock) return;
-    setGeneratingWithLovable(true);
-    try {
-      console.log('✨ Generating AI-powered schedule with Lovable AI...');
-
-      // Generate the AI prompt with all doctor preferences
-      const aiPrompt = generateAIPrompt();
-
-      // Prepare doctor data for the AI function
-      const doctorData = doctors.filter(d => d.active !== false).map(doctor => ({
-        id: doctor.id,
-        name: doctor.name
-      }));
-
-      // Call the Lovable AI scheduling edge function
-      const response = await supabase.functions.invoke('generate-ai-schedule-lovable', {
-        body: {
-          prompt: aiPrompt,
-          blockStartDate: currentBlock.start_monday_date,
-          doctors: doctorData
-        }
-      });
-      
-      if (response.error) {
-        console.error('Lovable AI scheduling error:', response.error);
-        throw new Error(response.error.message || 'Failed to generate AI schedule');
-      }
-      
-      const {
-        assignments: aiAssignments,
-        summary
-      } = response.data;
-      
-      if (!aiAssignments || aiAssignments.length === 0) {
-        throw new Error('AI returned no assignments');
-      }
-      
-      console.log(`📋 Lovable AI generated ${aiAssignments.length} assignments`);
-      if (summary) {
-        console.log('📊 Schedule summary:', summary);
-      }
-
-      await saveValidatedSchedule(aiAssignments.map((a: any) => ({ date: a.date, doctor_id: a.doctor_id, doctor_name: a.doctor_name })));
-      
-      toast({
-        title: "AI Schedule Generated Successfully! ✨",
-        description: `Created ${aiAssignments.length} assignments using Lovable AI (Gemini) with doctor preferences`
-      });
-      fetchData();
-    } catch (error: any) {
-      console.error('Error generating AI schedule with Lovable:', error);
-      toast({
-        title: "Lovable AI Schedule Generation Failed",
-        description: error.message || "Failed to generate schedule. Check console for details.",
-        variant: "destructive"
-      });
-    } finally {
-      setGeneratingWithLovable(false);
-    }
-  };
-  
   // Import ChatGPT schedule
   const importChatGPTSchedule = async () => {
     if (!importText.trim() && !importFile || !currentBlock) return;
@@ -668,28 +590,27 @@ const AdminDashboard = () => {
     }
   };
 
-  const cleanupOldData = async () => {
-    try {
+  const cleanupOldData = async (keepBlockId: string) => {
+    {
       // Delete doctor requests from blocks that are not the current active block
       // Keep published blocks' data but remove collecting/closed blocks that are old
       const { error } = await supabase
         .from('doctor_requests')
         .delete()
-        .not('block_id', 'eq', currentBlock?.id || '')
+        .neq('block_id', keepBlockId)
         .in('status', ['not_started', 'in_progress']);
       
       if (error) throw error;
       
-      console.log('Cleaned up old doctor requests');
-    } catch (error) {
-      console.error('Error cleaning up old data:', error);
     }
   };
 
   const manualCleanup = async () => {
+    if (!currentBlock) return;
+    if (!window.confirm('This deletes unfinished requests from older blocks. Requests for the current block are kept. Continue?')) return;
     setCleaningUp(true);
     try {
-      await cleanupOldData();
+      await cleanupOldData(currentBlock.id);
       await fetchData(); // Refresh the data
       toast({
         title: "Success",
@@ -943,6 +864,38 @@ const AdminDashboard = () => {
   };
 
   // Generate AI prompt based on doctor requests and preferences
+  const requestsWithData = () => doctorRequests.filter(req =>
+    currentBlock && req.block_id === currentBlock.id && (
+      (Array.isArray(req.unavailable_dates) && req.unavailable_dates.length > 0) ||
+      (Array.isArray(req.preferred_weekends) && req.preferred_weekends.length > 0) ||
+      (req.notes && String(req.notes).trim()) ||
+      req.status === 'submitted'
+    ));
+
+  const getPromptVars = (): Record<string, string> => {
+    if (!currentBlock) return {};
+    const start = parseLocalDate(currentBlock.start_monday_date);
+    const end = parseLocalDate(currentBlock.end_sunday_date);
+    const days = differenceInCalendarDays(end, start) + 1;
+    const active = doctors.filter(d => d.active);
+    const lastName = (n: string) => { const p = n.replace(/^Dr\.?\s+/i, '').trim().split(/\s+/); return p[p.length - 1]; };
+    const timeOff = requestsWithData()
+      .map(r => {
+        const d = doctors.find(x => x.id === r.doctor_id);
+        const dates = Array.isArray(r.unavailable_dates) ? r.unavailable_dates : [];
+        return d && dates.length ? `${lastName(d.name)}: ${dates.join(', ')}` : null;
+      })
+      .filter(Boolean)
+      .join('\n');
+    return {
+      doctors: active.map(d => lastName(d.name)).join(', '),
+      weeks: String(Math.round(days / 7)),
+      days: String(days),
+      start_date: format(start, 'yyyy-MM-dd'),
+      time_off: timeOff || 'None',
+    };
+  };
+
   const generateAIPrompt = () => {
     if (!currentBlock) return "No active block available.";
     const blockStart = parseLocalDate(currentBlock.start_monday_date);
@@ -950,8 +903,8 @@ const AdminDashboard = () => {
     
     const activeDoctors = doctors.filter(d => d.active);
     const doctorCount = activeDoctors.length;
-    const weekCount = doctorCount;
-    const totalDays = weekCount * 7;
+    const totalDays = differenceInCalendarDays(blockEnd, blockStart) + 1;
+    const weekCount = Math.round(totalDays / 7);
     const weekdaysPerDoctor = weekCount - 3; // Each doctor gets (N-3) weekdays (total weekdays = N*4, each doctor gets 4... actually N weeks * 4 weekdays = 4N, divided by N doctors = 4)
     // Actually: N weeks, 4 weekdays per week = 4N weekdays total, N doctors each get 1 weekend (3 days) leaving 4N weekdays / N = 4 per doctor
     const weekdayCount = 4; // Always 4 weekdays per doctor regardless of rotation size
@@ -964,7 +917,7 @@ const AdminDashboard = () => {
     const doctorNamesStr = doctorNames.join(', ');
 
     // Get submitted requests
-    const submittedRequests = doctorRequests.filter(req => req.status === 'submitted');
+    const submittedRequests = requestsWithData();
     let prompt = `**Role:** You are a medical call-scheduling AI. Generate an optimal ${weekCount}-week on-call schedule for ${doctorCount} doctors.
 
 **Schedule Period**
@@ -1047,45 +1000,11 @@ C) **Even distribution per week:** Avoid stacking many different doctors' weekda
     prompt += `
 
 **Output Requirements**
-Provide both human-readable and machine-readable outputs.
+Respond with JSON only — no other text — in exactly this shape, one entry per day (${totalDays} entries):
 
-1. **Readable schedule (by week):**
+{"schedule":[{"date":"YYYY-MM-DD","doctor_name":"${doctorNames[0] || 'LastName'}"}]}
 
-   * Week N (Mon–Sun with dates):
-     Mon, YYYY-MM-DD — {Doctor}
-     Tue, YYYY-MM-DD — {Doctor}
-     Wed, YYYY-MM-DD — {Doctor}
-     Thu, YYYY-MM-DD — {Doctor}
-     Fri, YYYY-MM-DD — {Doctor}  (Weekend Bundle if Fri)
-     Sat, YYYY-MM-DD — {Doctor}  (Weekend Bundle if Sat)
-     Sun, YYYY-MM-DD — {Doctor}  (Weekend Bundle if Sun)
-
-2. **Per-doctor summary:**
-
-   * {Doctor}: Weekend = Week # (Fri/Sat/Sun dates), Weekdays = [Week#/Day, …] (total must equal ${weekdayCount})
-
-3. **JSON payload (strict schema):**
-
-\`\`\`json
-{
-  "block": {
-    "start_monday": "${format(blockStart, 'yyyy-MM-dd')}",
-    "end_sunday": "${format(blockEnd, 'yyyy-MM-dd')}"
-  },
-  "assignments": [
-    {"date": "YYYY-MM-DD", "weekday": "Mon|Tue|Wed|Thu|Fri|Sat|Sun", "doctor": "${doctorNames.join('|')}", "is_weekend": true|false, "week_index": 1}
-    // ${totalDays} records total
-  ],
-  "doctor_summaries": [
-    {"doctor": "${doctorNames[0] || 'Name'}", "weekend_week_index": 3, "weekend_dates": ["YYYY-MM-DD","YYYY-MM-DD","YYYY-MM-DD"], "weekday_dates": ["YYYY-MM-DD", "YYYY-MM-DD", "YYYY-MM-DD", "YYYY-MM-DD"]}
-    // one per doctor
-  ],
-  "validation": {
-    "hard_constraints_passed": true,
-    "errors": []
-  }
-}
-\`\`\`
+doctor_name must be one of: ${doctorNamesStr}
 
 **Validator (run before returning output)**
 Confirm all of the following are true; otherwise set \`hard_constraints_passed=false\` and list each violation in \`errors\`:
@@ -1110,8 +1029,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
 
 **Failure / Infeasibility Behavior**
 
-* If infeasible under the hard constraints, do **not** relax them.
-* Return an **Infeasibility Report** listing the minimal conflicting elements.
+* If infeasible under the hard constraints, do **not** relax them; return {"schedule":[]}.
 
 **Formatting Notes**
 
@@ -1326,17 +1244,20 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
         progressPercent: 0
       };
     }
-    const submittedCount = doctorRequests.filter(req => req.status === 'submitted').length;
-    const inProgressCount = doctorRequests.filter(req => req.status === 'in_progress').length;
-    const notStartedCount = doctors.length - doctorRequests.length;
-    const progressPercent = doctors.length > 0 ? submittedCount / doctors.length * 100 : 0;
+    const active = doctors.filter(d => d.active);
+    const activeIds = new Set(active.map(d => d.id));
+    const blockReqs = doctorRequests.filter(req => activeIds.has(req.doctor_id) && (!currentBlock || req.block_id === currentBlock.id));
+    const submittedCount = blockReqs.filter(req => req.status === 'submitted').length;
+    const inProgressCount = blockReqs.filter(req => req.status === 'in_progress').length;
+    const notStartedCount = active.length - submittedCount - inProgressCount;
+    const progressPercent = active.length > 0 ? submittedCount / active.length * 100 : 0;
     return {
       submittedCount,
       inProgressCount,
       notStartedCount,
       progressPercent
     };
-  }, [doctorRequests, doctors]);
+  }, [doctorRequests, doctors, currentBlock]);
 
   // Create doctor status list with full request data
   const doctorStatuses = React.useMemo(() => {
@@ -1357,9 +1278,9 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     switch (status) {
       case 'submitted':
         return <Badge className="bg-success text-success-foreground"><CheckCircle className="h-3 w-3 mr-1" />Submitted</Badge>;
-      case 'in-progress':
+      case 'in_progress':
         return <Badge variant="outline" className="border-warning text-warning"><Clock className="h-3 w-3 mr-1" />In Progress</Badge>;
-      case 'not-started':
+      case 'not_started':
         return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Not Started</Badge>;
       default:
         return null;
@@ -1653,7 +1574,8 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
           unavailable_dates: editRequestForm.unavailable_dates.map(date => format(date, 'yyyy-MM-dd')),
           preferred_weekends: editRequestForm.preferred_weekends,
           notes: editRequestForm.notes,
-          status: 'not_started'
+          status: 'submitted',
+          submitted_at: new Date().toISOString()
         });
         if (error) throw error;
         toast({
@@ -1823,7 +1745,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-primary">{submissionStats.submittedCount}/{doctors.length}</div>
+                      <div className="text-2xl font-bold text-primary">{submissionStats.submittedCount}/{doctors.filter(d => d.active).length}</div>
                       <Progress value={submissionStats.progressPercent} className="mt-2" />
                     </CardContent>
                   </Card>
