@@ -22,15 +22,15 @@ async function readError(error: any, fallback: string) {
 
 export function GroupEmailComposer({ doctors }: { doctors: Doctor[] }) {
   const active = doctors.filter((d) => d.active !== false);
-  const [selected, setSelected] = useState<string[]>(() => active.map((d) => d.id));
+  const [excluded, setExcluded] = useState<string[]>([]);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [instructions, setInstructions] = useState("");
   const [drafting, setDrafting] = useState(false);
   const [sending, setSending] = useState(false);
-  const { confirm, ConfirmDialog } = useConfirm() as any;
+  const { confirm, dialog: ConfirmDialog } = useConfirm();
 
-  const selectedIds = selected.filter((id) => active.some((d) => d.id === id));
+  const selectedIds = active.filter((d) => !excluded.includes(d.id)).map((d) => d.id);
   const allSelected = selectedIds.length === active.length && active.length > 0;
 
   const draft = async () => {
@@ -52,7 +52,7 @@ export function GroupEmailComposer({ doctors }: { doctors: Doctor[] }) {
     const ok = await confirm({
       title: "Send this email?",
       description: `"${subject}" will go to ${selectedIds.length} doctor${selectedIds.length === 1 ? "" : "s"}.`,
-      confirmText: "Send",
+      confirmLabel: "Send",
     });
     if (!ok) return;
     setSending(true);
@@ -101,15 +101,15 @@ export function GroupEmailComposer({ doctors }: { doctors: Doctor[] }) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>Recipients ({selectedIds.length} of {active.length})</Label>
-            <Button variant="link" size="sm" onClick={() => setSelected(allSelected ? [] : active.map((d) => d.id))}>
+            <Button variant="link" size="sm" onClick={() => setExcluded(allSelected ? active.map((d) => d.id) : [])}>
               {allSelected ? "Clear all" : "Select all"}
             </Button>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {active.map((d) => (
               <label key={d.id} className="flex items-center gap-2 text-sm">
-                <Checkbox checked={selected.includes(d.id)}
-                  onCheckedChange={(c) => setSelected((s) => (c ? [...s, d.id] : s.filter((x) => x !== d.id)))} />
+                <Checkbox checked={!excluded.includes(d.id)}
+                  onCheckedChange={(c) => setExcluded((s) => (c ? s.filter((x) => x !== d.id) : [...s, d.id]))} />
                 <span>{d.name}</span>
                 <span className="text-muted-foreground truncate">{d.email}</span>
               </label>
