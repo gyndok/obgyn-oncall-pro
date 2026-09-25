@@ -1,9 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { corsHeaders, getAuthenticatedUser, unauthorized } from "../_shared/auth.ts";
+import { ON_CALL_CALENDAR_ID, STAFFING_CALENDAR_ID } from "../_shared/google.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_CALENDARS = new Set([ON_CALL_CALENDAR_ID, STAFFING_CALENDAR_ID]);
 
 interface CalendarRequest {
   calendarIds: string[];
@@ -19,6 +18,9 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    const authedUser = await getAuthenticatedUser(req);
+    if (!authedUser) return unauthorized();
+
     const apiKey = Deno.env.get("GOOGLE_CALENDAR_API_KEY");
     
     if (!apiKey) {
@@ -32,7 +34,10 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const { calendarIds, timeMin, timeMax, userEmail }: CalendarRequest = await req.json();
+    const body: CalendarRequest = await req.json();
+    const { timeMin, timeMax } = body;
+    const userEmail = authedUser.email ?? body.userEmail;
+    const calendarIds = (body.calendarIds ?? []).filter((id) => ALLOWED_CALENDARS.has(id));
 
     if (!calendarIds || calendarIds.length === 0) {
       return new Response(
@@ -176,15 +181,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Fetch US holidays
     try {
-      const currentYear = new Date().getFullYear();
-      const holidayUrl = `https://date.nager.at/api/v3/PublicHolidays/${currentYear}/US`;
-      
-      console.log(`Fetching US holidays for ${currentYear}`);
-      
-      const holidayResponse = await fetch(holidayUrl);
-      
-      if (holidayResponse.ok) {
-        const holidays = await holidayResponse.json();
+      const startYear = new Date(timeMin ?? Date.now()).getFullYear();
+      const endYear = new Date(timeMax ?? Date.now()).getFullYear();
+      const allHolidays: any[] = [];
+      for (let y = startYear; y <= Math.min(endYear, startYear + 3); y++) {
+        const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/US`);
+        if (r.ok) allHolidays.push(...(await r.json()));
+        else console.error('Error fetching holidays for', y, r.status);
+      }
+      {
+        const holidays = allHolidays;
         
         // Filter holidays to the requested time range and process them
         const filteredHolidays = holidays.filter((holiday: any) => {
@@ -218,8 +224,6 @@ const handler = async (req: Request): Promise<Response> => {
         
         allEvents.push(...holidayEvents);
         console.log(`Added ${holidayEvents.length} holidays`);
-      } else {
-        console.error('Error fetching holidays:', holidayResponse.status);
       }
     } catch (error) {
       console.error('Error processing holidays:', error);
