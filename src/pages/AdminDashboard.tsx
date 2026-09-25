@@ -92,48 +92,42 @@ const AdminDashboard = () => {
   const [importText, setImportText] = useState('');
   const [importing, setImporting] = useState(false);
 
+  const loadSaved = (key: string) => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  };
+
   // State for tracking individual reminder sends
   const [reminderSends, setReminderSends] = useState<Record<string, {
     sentAt: number;
     success: boolean;
-  }>>({});
+  }>>(() => loadSaved('adminReminderSends'));
 
-  // State for tracking individual schedule email sends
+  // State for tracking individual schedule email sends (sending flag never persisted)
   const [scheduleEmailSends, setScheduleEmailSends] = useState<Record<string, {
     sentAt: number;
     success: boolean;
     sending: boolean;
-  }>>({});
+  }>>(() => {
+    const saved = loadSaved('adminScheduleEmailSends');
+    Object.keys(saved).forEach(k => { saved[k] = { ...saved[k], sending: false }; });
+    return saved;
+  });
 
-  // Load reminder sends from localStorage on mount
-  useEffect(() => {
-    const savedReminderSends = localStorage.getItem('adminReminderSends');
-    if (savedReminderSends) {
-      try {
-        setReminderSends(JSON.parse(savedReminderSends));
-      } catch (error) {
-        console.error('Error loading reminder sends from localStorage:', error);
-      }
-    }
-
-    const savedScheduleEmailSends = localStorage.getItem('adminScheduleEmailSends');
-    if (savedScheduleEmailSends) {
-      try {
-        setScheduleEmailSends(JSON.parse(savedScheduleEmailSends));
-      } catch (error) {
-        console.error('Error loading schedule email sends from localStorage:', error);
-      }
-    }
-  }, []);
-
-  // Save reminder sends to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('adminReminderSends', JSON.stringify(reminderSends));
   }, [reminderSends]);
 
-  // Save schedule email sends to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('adminScheduleEmailSends', JSON.stringify(scheduleEmailSends));
+    const toSave: Record<string, { sentAt: number; success: boolean }> = {};
+    Object.entries(scheduleEmailSends).forEach(([k, v]) => {
+      if (!v.sending) toSave[k] = { sentAt: v.sentAt, success: v.success };
+    });
+    localStorage.setItem('adminScheduleEmailSends', JSON.stringify(toSave));
   }, [scheduleEmailSends]);
 
   // Check if a doctor can receive a reminder (24 hour cooldown)
@@ -229,7 +223,7 @@ const AdminDashboard = () => {
       const {
         data: doctorsData,
         error: doctorsError
-      } = await supabase.from('doctors').select('*').order('name');
+      } = await supabase.from('doctors').select('id, name, email, mobile, active, is_admin, created_at, first_login_at, auth_user_id, account_setup_completed, google_email').order('name');
       if (doctorsError) throw doctorsError;
       setDoctors(doctorsData || []);
       if (activeBlock) {
@@ -1203,7 +1197,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     const {
       data,
       error
-    } = await supabase.from('doctors').select('*').order('name');
+    } = await supabase.from('doctors').select('id, name, email, mobile, active, is_admin, created_at, first_login_at, auth_user_id, account_setup_completed, google_email').order('name');
     if (error) {
       console.error('Error fetching all doctors:', error);
       return [];
@@ -1448,33 +1442,36 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     let errorCount = 0;
 
     // Send emails with a small delay between each
+    let skippedCount = 0;
     for (const doctor of nonSubmitters) {
+      if (!canSendReminder(doctor.id)) {
+        skippedCount++;
+        continue;
+      }
+      let success = false;
       try {
-        console.log(`📧 Sending reminder email to ${doctor.name} (${doctor.email})`);
         const response = await supabase.functions.invoke('send-reminder-email', {
           body: {
             doctorName: doctor.name,
             doctorEmail: doctor.email,
-            blockTitle: `${currentBlock.title} (${blockDates})`,
+            blockTitle: `Call Block (${blockDates})`,
             submissionDeadline: deadlineText,
             doctorPortalUrl: `${window.location.origin}/doctor`
           }
         });
-        if (response.error) {
-          console.error(`Failed to send email to ${doctor.name}:`, response.error);
-          errorCount++;
-        } else {
-          console.log(`✅ Email sent successfully to ${doctor.name}`);
-          successCount++;
-        }
-
-        // Small delay between emails
+        success = !response.error;
+        if (response.error) console.error(`Failed to send email to ${doctor.name}:`, response.error);
         await new Promise(resolve => setTimeout(resolve, 500));
       } catch (error) {
         console.error(`Error sending email to ${doctor.name}:`, error);
-        errorCount++;
       }
+      if (success) successCount++; else errorCount++;
+      setReminderSends(prev => ({ ...prev, [doctor.id]: { sentAt: Date.now(), success } }));
     }
+    if (skippedCount > 0) {
+      toast({ title: "Some skipped", description: `${skippedCount} doctor(s) got a reminder in the last 24 hours and were skipped.` });
+    }
+    if (successCount === 0 && errorCount === 0) return;
 
     // Show final result
     if (successCount > 0 && errorCount === 0) {
@@ -1497,15 +1494,19 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     }
   };
   const handleSendTestEmail = async () => {
-    // Send test email to verify the reminder format
+    const { data: { user: me } } = await supabase.auth.getUser();
+    const myEmail = me?.email;
+    if (!myEmail) {
+      toast({ title: "No email on your account", variant: "destructive" });
+      return;
+    }
     try {
-      console.log('📧 Sending test email to gyndok@yahoo.com');
       const response = await supabase.functions.invoke('send-reminder-email', {
         body: {
-          doctorName: "Dr. Test User",
-          doctorEmail: "gyndok@yahoo.com",
-          blockTitle: "Sample Call Block (November 3 - December 21, 2025)",
-          submissionDeadline: "September 15, 2025",
+          doctorName: "Test User",
+          doctorEmail: myEmail,
+          blockTitle: "Sample Call Block",
+          submissionDeadline: "Sample deadline",
           doctorPortalUrl: `${window.location.origin}/doctor`,
           isTest: true
         }
@@ -1518,10 +1519,9 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
           variant: "destructive"
         });
       } else {
-        console.log('✅ Test email sent successfully');
         toast({
           title: "Test Email Sent",
-          description: "Check your inbox at gyndok@yahoo.com"
+          description: `Check your inbox at ${myEmail}`
         });
       }
     } catch (error) {

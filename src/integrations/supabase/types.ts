@@ -362,6 +362,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_block_request_summary: { Args: { p_block_id: string }; Returns: Json }
       link_my_doctor_account: { Args: never; Returns: undefined }
       replace_block_assignments: {
         Args: { p_block_id: string; p_rows: Json }

@@ -23,7 +23,9 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authLoading, setLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(true);
+  const loading = authLoading || roleLoading;
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -32,6 +34,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        if (session?.user) setRoleLoading(true);
         setLoading(false);
 
         // Defer role lookup to avoid deadlocks inside the auth callback
@@ -41,6 +44,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }, 0);
         } else {
           setIsAdmin(false);
+          setRoleLoading(false);
         }
       }
     );
@@ -52,6 +56,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
       if (session?.user) {
         void fetchAdminRole(session.user.id);
+      } else {
+        setRoleLoading(false);
       }
     });
 
@@ -68,9 +74,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (error) {
       console.error("Failed to load user role:", error);
       setIsAdmin(false);
+      setRoleLoading(false);
       return;
     }
     setIsAdmin(!!data);
+    setRoleLoading(false);
   };
 
   const signOut = async () => {

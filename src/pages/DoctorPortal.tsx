@@ -104,8 +104,8 @@ const DoctorPortal = () => {
   const [saving, setSaving] = useState(false);
   const [weekends, setWeekends] = useState<any[]>([]);
   const [doctorRecord, setDoctorRecord] = useState<any>(null);
-  const [allDoctorRequests, setAllDoctorRequests] = useState<any[]>([]);
-  const [allDoctors, setAllDoctors] = useState<any[]>([]);
+  const [notRegistered, setNotRegistered] = useState(false);
+  const [summary, setSummary] = useState<{ total_doctors: number; submitted: number; in_progress: number; weekend_counts: Record<string, number> } | null>(null);
 
   // Calendar view state
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
@@ -175,14 +175,10 @@ const DoctorPortal = () => {
         const {
           data: doctor,
           error: doctorError
-        } = await supabase.from('doctors').select('*').eq('email', user.email).maybeSingle();
+        } = await supabase.from('doctors').select('id, name, email, active').eq('email', (user.email || '').toLowerCase()).maybeSingle();
         if (doctorError) throw doctorError;
         if (!doctor) {
-          toast({
-            title: "Access Denied",
-            description: "You are not registered as a doctor in the system. Please contact your administrator.",
-            variant: "destructive"
-          });
+          setNotRegistered(true);
           setLoading(false);
           return;
         }
@@ -231,20 +227,9 @@ const DoctorPortal = () => {
           } = await supabase.from('doctor_requests').select('*').eq('block_id', block.id).eq('doctor_id', doctor.id).maybeSingle();
           if (requestError) throw requestError;
 
-          // Fetch all doctors and their requests for team status (ONLY for current block)
-          const {
-            data: allDoctorsData,
-            error: allDoctorsError
-          } = await supabase.from('doctors').select('*').eq('active', true).order('name');
-          if (allDoctorsError) throw allDoctorsError;
-          setAllDoctors(allDoctorsData || []);
-          const {
-            data: allRequestsData,
-            error: allRequestsError
-          } = await supabase.from('doctor_requests').select('*, doctors(name, email)').eq('block_id', block.id); // CRITICAL: Only get requests for current block
-
-          if (allRequestsError) throw allRequestsError;
-          setAllDoctorRequests(allRequestsData || []);
+          const { data: summaryData, error: summaryError } = await supabase.rpc('get_block_request_summary' as any, { p_block_id: block.id });
+          if (summaryError) console.error('Summary load failed:', summaryError);
+          else setSummary(summaryData as any);
           if (request) {
             setDoctorRequest(request);
             setSelectedUnavailableDates(Array.isArray(request.unavailable_dates) ? request.unavailable_dates.map((date: string) => parseLocalDate(date)) : []);
@@ -276,7 +261,7 @@ const DoctorPortal = () => {
         unavailable_dates: selectedUnavailableDates.map(date => format(date, 'yyyy-MM-dd')),
         preferred_weekends: preferredWeekends,
         notes: notes,
-        status: 'in_progress',
+        status: status === 'submitted' ? 'submitted' : 'in_progress',
         updated_at: new Date().toISOString()
       };
       if (doctorRequest) {
@@ -294,7 +279,7 @@ const DoctorPortal = () => {
         if (error) throw error;
         setDoctorRequest(data);
       }
-      setStatus('in_progress');
+      if (status !== 'submitted') setStatus('in_progress');
       toast({
         title: "Draft Saved",
         description: "Your preferences have been saved. You can submit when ready."
@@ -367,7 +352,7 @@ const DoctorPortal = () => {
   };
 
   // Check if editing is allowed (not if block is closed/published)
-  const canEdit = currentBlock && currentBlock.status === 'collecting';
+  const canEdit = !!currentBlock && currentBlock.status === 'collecting' && (!currentBlock.deadline || new Date() < new Date(currentBlock.deadline));
   const isSubmitted = status === 'submitted';
   if (loading) {
     return <ProtectedRoute>
@@ -379,18 +364,16 @@ const DoctorPortal = () => {
         </div>
       </ProtectedRoute>;
   }
-  if (!currentBlock) {
+  if (notRegistered) {
     return <ProtectedRoute>
         <div className="min-h-screen bg-background p-4">
-          <div className="container mx-auto max-w-4xl">
-            <div className="text-center py-16">
-              <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-2xl font-bold mb-2">No Active Call Block</h2>
-              <p className="text-muted-foreground">
-                There are currently no active call blocks available for submission.
-                Please check back later or contact your administrator.
-              </p>
-            </div>
+          <div className="container mx-auto max-w-2xl text-center py-16">
+            <AlertTriangle className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Account not registered</h2>
+            <p className="text-muted-foreground mb-6">
+              Your account ({user?.email}) isn't registered as a doctor. Please contact the scheduler.
+            </p>
+            <Button variant="outline" onClick={signOut}><LogOut className="h-4 w-4" />Logout</Button>
           </div>
         </div>
       </ProtectedRoute>;
@@ -422,7 +405,7 @@ const DoctorPortal = () => {
           </div>
 
           {/* Block Information */}
-          <Card className="card-stats mb-6">
+          {currentBlock && <Card className="card-stats mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <CalendarIcon className="h-5 w-5 text-primary" />
@@ -447,9 +430,9 @@ const DoctorPortal = () => {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Card>}
 
-          <Tabs defaultValue="preferences" className="space-dashboard">
+          <Tabs defaultValue={currentBlock ? "preferences" : "schedule"} className="space-dashboard">
             <TabsList className="grid w-full grid-cols-3 h-12 p-1 bg-muted rounded-xl">
               <TabsTrigger value="preferences" className="rounded-lg font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <span className="hidden sm:inline">Submit </span>Preferences
@@ -464,6 +447,11 @@ const DoctorPortal = () => {
 
             {/* Preferences Tab */}
             <TabsContent value="preferences" className="space-dashboard">
+              {!currentBlock ? <Card className="card-stats"><CardContent className="py-12 text-center">
+                  <CalendarIcon className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-lg font-medium">No request period is open right now.</p>
+                  <p className="text-muted-foreground">Check back later or contact the scheduler.</p>
+                </CardContent></Card> : <>
               <div className="grid lg:grid-cols-2 gap-6">
                 {/* Unavailable Dates */}
                 <Card className="card-stats hover-lift">
@@ -571,7 +559,7 @@ const DoctorPortal = () => {
                     <div className="space-y-3">
                       {weekends.map(weekend => {
                       // Find doctors who have already requested this weekend
-                      const doctorsWhoRequestedWeekend = allDoctorRequests.filter(request => request.status === 'submitted' && Array.isArray(request.preferred_weekends) && request.preferred_weekends.includes(weekend.id)).map(request => request.doctors?.name).filter(Boolean);
+                      const othersCount = summary?.weekend_counts?.[String(weekend.id)] ?? 0;
                       return <div key={weekend.id} className="flex items-start space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
                             <Checkbox id={`weekend-${weekend.id}`} checked={preferredWeekends.includes(weekend.id)} onCheckedChange={checked => {
                           if (checked) {
@@ -583,8 +571,8 @@ const DoctorPortal = () => {
                             <Label htmlFor={`weekend-${weekend.id}`} className="flex-1 cursor-pointer">
                               <div className="font-medium text-sm sm:text-base">{weekend.label}</div>
                               <div className="text-xs sm:text-sm text-muted-foreground">{weekend.dates}</div>
-                              {doctorsWhoRequestedWeekend.length > 0 && <div className="text-xs text-destructive mt-1">
-                                  Already requested by: {doctorsWhoRequestedWeekend.join(', ')}
+                              {othersCount > 0 && <div className="text-xs text-destructive mt-1">
+                                  {othersCount} other{othersCount === 1 ? '' : 's'} picked this weekend
                                 </div>}
                             </Label>
                           </div>;
@@ -634,15 +622,16 @@ const DoctorPortal = () => {
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button variant="outline" onClick={handleSaveDraft} disabled={!canEdit || saving} className="btn-outline-modern">
+                {!isSubmitted && <Button variant="outline" onClick={handleSaveDraft} disabled={!canEdit || saving} className="btn-outline-modern">
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? "Saving..." : "Save Draft"}
-                </Button>
+                </Button>}
                 <Button onClick={handleSubmit} disabled={!canEdit || saving} className="btn-primary-glow">
                   <Send className="h-4 w-4 mr-2" />
                   {saving ? "Submitting..." : isSubmitted ? "Update Submission" : "Submit Preferences"}
                 </Button>
               </div>
+              </>}
             </TabsContent>
 
             {/* Team Status Tab */}
@@ -654,78 +643,32 @@ const DoctorPortal = () => {
                     Team Submission Status
                   </CardTitle>
                   <CardDescription>
-                    View the status of all doctors' call preference submissions
+                    How many doctors have sent in their preferences
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3 sm:space-y-4">
-                    {allDoctors.map(doctor => {
-                    const request = allDoctorRequests.find(req => req.doctors?.email === doctor.email);
-                    const status = request?.status || 'not_started';
-                    return <div key={doctor.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg border border-border space-y-2 sm:space-y-0">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm sm:text-base truncate">{doctor.name}</div>
-                            <div className="text-xs sm:text-sm text-muted-foreground truncate">{doctor.email}</div>
-                            
-                            {/* Show basic request info if submitted */}
-                            {request && status === 'submitted' && <div className="mt-2 space-y-1">
-                                {request.unavailable_dates && request.unavailable_dates.length > 0 && <div className="text-xs">
-                                    <span className="text-muted-foreground">Unavailable dates: </span>
-                                    <span className="font-medium">
-                                      {request.unavailable_dates.map((dateStr: string) => format(parseLocalDate(dateStr), 'MMM d')).join(', ')}
-                                    </span>
-                                  </div>}
-                                {request.preferred_weekends && request.preferred_weekends.length > 0 && <div className="text-xs">
-                                    <span className="text-muted-foreground">Preferred weekends: </span>
-                                    <span className="font-medium">
-                                      {request.preferred_weekends.map((w: number) => `Week ${w}`).join(', ')}
-                                    </span>
-                                  </div>}
-                                {request.notes && request.notes.trim() && <div className="text-xs">
-                                    <span className="text-muted-foreground">Notes: </span>
-                                    <span className="font-medium">{request.notes}</span>
-                                  </div>}
-                              </div>}
-                          </div>
-                          <div className="flex justify-end sm:ml-4">
-                            {status === 'submitted' && <Badge variant="default" className="bg-success text-success-foreground text-xs">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Submitted
-                              </Badge>}
-                            {status === 'in_progress' && <Badge variant="secondary" className="text-xs">
-                                <Clock className="h-3 w-3 mr-1" />
-                                In Progress
-                              </Badge>}
-                            {status === 'not_started' && <Badge variant="outline" className="text-xs">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                Not Started
-                              </Badge>}
-                          </div>
-                        </div>;
-                  })}
-                  </div>
-                  
                    {/* Summary Stats */}
-                  <div className="mt-6 pt-6 border-t grid grid-cols-3 gap-6">
+                  {!currentBlock && <p className="text-muted-foreground mb-4">No request period is open right now.</p>}
+                  {currentBlock && <div className="grid grid-cols-3 gap-6">
                     <div className="text-center p-4 rounded-lg bg-success/10 border border-success/20">
                       <div className="stat-number text-success">
-                        {allDoctorRequests.filter(req => req.status === 'submitted').length}
+                        {summary?.submitted ?? 0}
                       </div>
                       <div className="stat-label">Submitted</div>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-warning/10 border border-warning/20">
                       <div className="stat-number text-warning">
-                        {allDoctorRequests.filter(req => req.status === 'in_progress').length}
+                        {summary?.in_progress ?? 0}
                       </div>
                       <div className="stat-label">In Progress</div>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-muted/50 border border-border">
                       <div className="stat-number text-muted-foreground">
-                        {allDoctors.length - allDoctorRequests.length}
+                        {Math.max(0, (summary?.total_doctors ?? 0) - (summary?.submitted ?? 0) - (summary?.in_progress ?? 0))}
                       </div>
                       <div className="stat-label">Not Started</div>
                     </div>
-                  </div>
+                  </div>}
                 </CardContent>
               </Card>
             </TabsContent>
