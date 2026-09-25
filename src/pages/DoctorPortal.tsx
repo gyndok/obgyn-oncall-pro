@@ -17,6 +17,10 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Check, List, LayoutGrid } from "lucide-react";
+import { differenceInHours, formatDistanceToNowStrict } from "date-fns";
 
 // Helper function to parse date-only strings as local dates (avoiding UTC timezone issues)
 const parseLocalDate = (dateString: string) => {
@@ -111,6 +115,29 @@ const DoctorPortal = () => {
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const isMobile = useIsMobile();
+  const [monthView, setMonthView] = useState(false);
+  const [myShifts, setMyShifts] = useState<{ date: string; weekday_name: string; is_weekend: boolean }[]>([]);
+  const [rangeMode, setRangeMode] = useState(false);
+  const [rangeAnchor, setRangeAnchor] = useState<Date | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Upcoming 60 days of my own published shifts
+  useEffect(() => {
+    if (!doctorRecord?.id) return;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const until = format(addDays(new Date(), 60), 'yyyy-MM-dd');
+    supabase.from('assignments').select('date, weekday_name, is_weekend')
+      .eq('doctor_id', doctorRecord.id).gte('date', today).lte('date', until).order('date')
+      .then(({ data }) => setMyShifts(data ?? []));
+  }, [doctorRecord?.id]);
+
+  const toggleDates = (dates: Date[], select: boolean) => {
+    const key = (d: Date) => format(d, 'yyyy-MM-dd');
+    const map = new Map(selectedUnavailableDates.map(d => [key(d), d]));
+    dates.forEach(d => select ? map.set(key(d), d) : map.delete(key(d)));
+    setSelectedUnavailableDates([...map.values()].sort((a, b) => a.getTime() - b.getTime()));
+  };
 
   // Fetch calendar events
   const calendarRequestId = React.useRef(0);
@@ -357,6 +384,13 @@ const DoctorPortal = () => {
   // Check if editing is allowed (not if block is closed/published)
   const canEdit = !!currentBlock && currentBlock.status === 'collecting' && (!currentBlock.deadline || new Date() < new Date(currentBlock.deadline));
   const isSubmitted = status === 'submitted';
+  const deadlineDate = currentBlock?.deadline ? new Date(currentBlock.deadline) : null;
+  const hoursLeft = deadlineDate ? differenceInHours(deadlineDate, new Date()) : null;
+  const deadlinePast = !!deadlineDate && deadlineDate.getTime() <= Date.now();
+  const chip = !canEdit ? { label: 'Locked', cls: 'bg-muted text-muted-foreground' }
+    : isSubmitted ? { label: 'Submitted', cls: 'bg-success text-success-foreground' }
+    : status === 'in_progress' ? { label: 'Draft', cls: 'bg-warning/20 text-warning' }
+    : { label: 'Not started', cls: 'bg-muted text-foreground' };
   if (loading) {
     return <ProtectedRoute>
         <div className="min-h-screen bg-background flex items-center justify-center">
@@ -383,17 +417,17 @@ const DoctorPortal = () => {
   }
   return <ProtectedRoute>
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto max-w-6xl p-6">
+        <div className="container mx-auto max-w-6xl p-3 sm:p-6 pb-28 sm:pb-6">
           {/* Header */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                 <h1 className="heading-dashboard">Doctor Portal</h1>
                 <Badge variant="secondary" className="px-3 py-1">
                   {doctorRecord?.name || user?.email}
                 </Badge>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 {isAdmin && <Button variant="outline" onClick={() => navigate('/admin')} className="btn-outline-modern">
                     <Settings className="h-4 w-4" />
                     Admin Dashboard
@@ -455,6 +489,13 @@ const DoctorPortal = () => {
                   <p className="text-lg font-medium">No request period is open right now.</p>
                   <p className="text-muted-foreground">Check back later or contact the scheduler.</p>
                 </CardContent></Card> : <>
+              <div role="status" className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 ${deadlinePast ? 'border-destructive bg-destructive/10 text-destructive' : hoursLeft !== null && hoursLeft <= 48 ? 'border-warning bg-warning/10 text-warning' : 'border-border bg-muted/40'}`}>
+                <span className="flex items-center gap-2 font-medium">
+                  <Clock className="h-4 w-4" />
+                  {!deadlineDate ? 'No deadline set' : deadlinePast ? `Requests closed ${format(deadlineDate, 'EEE MMM d, h:mm a')}` : `Requests due in ${formatDistanceToNowStrict(deadlineDate)} (${format(deadlineDate, 'EEE MMM d, h:mm a')})`}
+                </span>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${chip.cls}`}>{chip.label}</span>
+              </div>
               <div className="grid lg:grid-cols-2 gap-6">
                 {/* Unavailable Dates */}
                 <Card className="card-stats hover-lift">
@@ -498,29 +539,50 @@ const DoctorPortal = () => {
                             const isSelected = selectedUnavailableDates.some(selectedDate => format(selectedDate, 'yyyy-MM-dd') === dateString);
                             const holidayInfo = getHolidayInfo(currentDate);
                             const isHolidayDate = !!holidayInfo;
-                            dates.push(<button key={dateString} type="button" disabled={!canEdit} title={holidayInfo ? holidayInfo.name : undefined} onClick={() => {
-                              if (isSelected) {
-                                // Remove date
-                                setSelectedUnavailableDates(selectedUnavailableDates.filter(selectedDate => format(selectedDate, 'yyyy-MM-dd') !== dateString));
-                              } else {
-                                // Add date
-                                setSelectedUnavailableDates([...selectedUnavailableDates, currentDate]);
+                            dates.push(<button key={dateString} type="button" disabled={!canEdit} aria-pressed={isSelected} aria-label={`${format(currentDate, 'EEEE, MMMM d, yyyy')}${holidayInfo ? `, ${holidayInfo.name}` : ''}${isSelected ? ', unavailable' : ''}`} title={holidayInfo ? holidayInfo.name : undefined} onClick={() => {
+                              if (rangeMode) {
+                                if (!rangeAnchor) { setRangeAnchor(currentDate); return; }
+                                const [a, b] = rangeAnchor <= currentDate ? [rangeAnchor, currentDate] : [currentDate, rangeAnchor];
+                                toggleDates(eachDayOfInterval({ start: a, end: b }), true);
+                                setRangeAnchor(null);
+                                return;
                               }
+                              toggleDates([currentDate], !isSelected);
                             }} className={`
                                     aspect-square p-1 sm:p-2 text-xs sm:text-sm border rounded-md transition-all relative min-h-[40px] sm:min-h-[48px]
-                                    ${isSelected ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' : isHolidayDate ? 'bg-accent/10 border-accent text-accent hover:bg-accent/20 font-semibold' : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'}
+                                    ${rangeAnchor && isSameDay(rangeAnchor, currentDate) ? 'ring-2 ring-primary ' : ''}${isSelected ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' : isHolidayDate ? 'bg-accent/10 border-accent text-accent hover:bg-accent/20 font-semibold' : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'}
                                     ${!canEdit ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 active:scale-95'}
                                   `}>
                                   <div className="flex flex-col items-center justify-center h-full">
                                     <span className="font-medium">{format(currentDate, 'd')}</span>
                                     <span className="text-xs opacity-75 hidden sm:block">{format(currentDate, 'MMM')}</span>
                                     {isHolidayDate && <Star className="h-2 w-2 absolute top-1 right-1" />}
+                                    {isSelected && <Check className="h-3 w-3 absolute bottom-0.5 right-0.5" aria-hidden="true" />}
                                   </div>
                                 </button>);
                           }
                         }
                         return dates;
                       })()}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
+                        <Button type="button" size="sm" variant={rangeMode ? 'default' : 'outline'} disabled={!canEdit} onClick={() => { setRangeMode(!rangeMode); setRangeAnchor(null); }}>
+                          {rangeMode ? (rangeAnchor ? 'Tap end date' : 'Tap start date') : 'Select a range'}
+                        </Button>
+                        {(() => {
+                          const start = parseLocalDate(currentBlock.start_monday_date);
+                          const end = parseLocalDate(currentBlock.end_sunday_date);
+                          const weeks = Math.round((end.getTime() - start.getTime()) / 86400000 + 1) / 7;
+                          return Array.from({ length: weeks }, (_, w) => {
+                            const days = eachDayOfInterval({ start: addWeeks(start, w), end: addDays(addWeeks(start, w), 6) });
+                            const all = days.every(d => selectedUnavailableDates.some(s => isSameDay(s, d)));
+                            return <Button key={w} type="button" size="sm" variant={all ? 'secondary' : 'outline'} disabled={!canEdit} aria-pressed={all} onClick={() => toggleDates(days, !all)}>
+                              Week {w + 1}
+                            </Button>;
+                          });
+                        })()}
+                        <span className="text-sm text-muted-foreground ml-auto">{selectedUnavailableDates.length} day{selectedUnavailableDates.length === 1 ? '' : 's'} selected</span>
                       </div>
 
                       {/* Legend */}
@@ -624,16 +686,42 @@ const DoctorPortal = () => {
                 </Alert>}
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t bg-background/95 p-3 backdrop-blur sm:static sm:z-auto sm:flex-row sm:gap-4 sm:border-0 sm:bg-transparent sm:p-0 [&>button]:flex-1 sm:[&>button]:flex-none">
                 {!isSubmitted && <Button variant="outline" onClick={handleSaveDraft} disabled={!canEdit || saving} className="btn-outline-modern">
                   <Save className="h-4 w-4 mr-2" />
                   {saving ? "Saving..." : "Save Draft"}
                 </Button>}
-                <Button onClick={handleSubmit} disabled={!canEdit || saving} className="btn-primary-glow">
+                <Button onClick={() => setConfirmOpen(true)} disabled={!canEdit || saving} className="btn-primary-glow">
                   <Send className="h-4 w-4 mr-2" />
                   {saving ? "Submitting..." : isSubmitted ? "Update Submission" : "Submit Preferences"}
                 </Button>
               </div>
+              <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Submit your requests?</DialogTitle>
+                    <DialogDescription>Please check everything before submitting.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <p className="font-medium">Unavailable dates ({selectedUnavailableDates.length})</p>
+                      <p className="text-muted-foreground">{selectedUnavailableDates.length ? [...selectedUnavailableDates].sort((a, b) => a.getTime() - b.getTime()).map(d => format(d, 'EEE MMM d')).join(', ') : 'None'}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Preferred weekends</p>
+                      <p className="text-muted-foreground">{preferredWeekends.length ? [...preferredWeekends].sort((a, b) => a - b).map(w => `Week ${w}`).join(', ') : 'None'}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Notes</p>
+                      <p className="text-muted-foreground whitespace-pre-wrap">{notes.trim() || 'None'}</p>
+                    </div>
+                  </div>
+                  <DialogFooter className="gap-2">
+                    <Button variant="outline" onClick={() => setConfirmOpen(false)}>Go back</Button>
+                    <Button onClick={() => { setConfirmOpen(false); handleSubmit(); }}>Submit</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
               </>}
             </TabsContent>
 
@@ -689,26 +777,46 @@ const DoctorPortal = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {isMobile && <div className="flex justify-end mb-4">
+                    <Button variant="outline" size="sm" onClick={() => setMonthView(!monthView)}>
+                      {monthView ? <><List className="h-4 w-4 mr-2" />My shifts</> : <><LayoutGrid className="h-4 w-4 mr-2" />Month view</>}
+                    </Button>
+                  </div>}
+                  {isMobile && !monthView ? <div>
+                    <h3 className="text-lg font-semibold mb-3">My upcoming shifts (next 60 days)</h3>
+                    {myShifts.length === 0 ? <p className="text-muted-foreground">No published shifts in the next 60 days.</p> : <ul className="divide-y rounded-lg border">
+                      {myShifts.map(s => <li key={s.date} className="flex items-center justify-between p-3">
+                        <div>
+                          <p className="font-medium">{format(parseLocalDate(s.date), 'EEE, MMM d')}</p>
+                          <p className="text-sm text-muted-foreground">{s.is_weekend ? 'Weekend call' : 'Weekday call'}</p>
+                        </div>
+                        {s.is_weekend && <Badge variant="secondary">Weekend</Badge>}
+                      </li>)}
+                    </ul>}
+                  </div> : <>
                   {/* Calendar Header */}
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-semibold">
                       {format(currentMonth, 'MMMM yyyy')}
                     </h3>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}>
+                      <Button variant="outline" size="sm" aria-label="Previous month" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}>
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date())}>
                         Today
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}>
+                      <Button variant="outline" size="sm" aria-label="Next month" onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}>
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
 
                   {/* Calendar Grid */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative" aria-busy={calendarLoading}>
+                    {calendarLoading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60">
+                      <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" aria-label="Loading calendar events"></div>
+                    </div>}
                     {/* Day Headers */}
                     <div className="grid grid-cols-7 gap-1 mb-2">
                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
@@ -794,8 +902,8 @@ const DoctorPortal = () => {
                             }
                           }
                         };
-                        return <div key={day.toString()} className={`
-                                min-h-[80px] p-2 border rounded-md
+                        return <div key={day.toString()} aria-label={`${format(day, 'EEEE, MMMM d')}${dayEvents.length ? ': ' + dayEvents.map(e => e.title).join(', ') : ''}`} className={`
+                                min-h-[80px] p-1 sm:p-2 border rounded-md
                                 ${isCurrentMonth ? 'bg-background' : 'bg-muted/30 text-muted-foreground'}
                                 ${isCurrentDay ? 'ring-2 ring-primary' : ''}
                               `}>
@@ -803,7 +911,7 @@ const DoctorPortal = () => {
                                 {format(day, 'd')}
                               </div>
                               <div className="space-y-1">
-                                 {dayEvents.map((event, idx) => <div key={idx} className={`text-[10px] p-0.5 rounded text-center leading-tight ${getEventColor(event.calendarId, event.isUserEvent, event.title, doctorRecord?.name || '', (event as any).isHoliday)}`} title={`${event.title} - ${event.calendarId.includes('odn75bvuc02onjrb0ai9oskbc4') ? 'Staffing' : 'Call'}`}>
+                                 {dayEvents.map((event, idx) => <div key={idx} className={`text-xs p-0.5 rounded break-words text-center leading-tight ${getEventColor(event.calendarId, event.isUserEvent, event.title, doctorRecord?.name || '', (event as any).isHoliday)}`} title={`${event.title} - ${event.calendarId.includes('odn75bvuc02onjrb0ai9oskbc4') ? 'Staffing' : 'Call'}`}>
                                      {event.title}
                                    </div>)}
                               </div>
@@ -813,16 +921,7 @@ const DoctorPortal = () => {
                     </div>
                   </div>
 
-                   {/* Setup Instructions */}
-                  <Alert className="mt-6">
-                    <CalendarIcon className="h-4 w-4" />
-                    
-                  </Alert>
-
-                  {calendarLoading && <div className="text-center py-8">
-                      <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                      <p className="text-sm text-muted-foreground">Loading calendar events...</p>
-                    </div>}
+                  </>}
                 </CardContent>
               </Card>
             </TabsContent>
