@@ -155,7 +155,7 @@ const handler = async (req: Request): Promise<Response> => {
         console.log(`Sending email to ${doctor.name}...`);
 
         const emailResponse = await resend.emails.send({
-          from: "Call Schedule Portal <onboarding@resend.dev>",
+          from: "Call Schedule Portal <schedule@geffreyklein.com>",
           to: [doctor.email],
           subject: `Your Call Schedule - ${blockTitle}`,
           html: `
