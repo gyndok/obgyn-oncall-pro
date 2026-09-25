@@ -21,6 +21,7 @@ import ScheduleVisualization from "@/components/ScheduleVisualization";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { GoogleCalendarConnect } from "@/components/GoogleCalendarConnect";
 import { AIPromptEditor } from "@/components/AIPromptEditor";
+import { GroupEmailComposer } from "@/components/GroupEmailComposer";
 import { supabase } from "@/integrations/supabase/client";
 import { validateAssignments, type RawAssignment } from "@/lib/schedule/validateAssignments";
 import { format, addDays, addWeeks, differenceInCalendarDays } from "date-fns";
@@ -1719,6 +1720,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
             <TabsTrigger value="doctors">Doctors</TabsTrigger>
             <TabsTrigger value="publish">Publish</TabsTrigger>
+            <TabsTrigger value="email">Email</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
@@ -2232,6 +2234,10 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
           </TabsContent>
 
           {/* Settings Tab */}
+          <TabsContent value="email" className="space-y-6">
+            <GroupEmailComposer doctors={doctors} />
+          </TabsContent>
+
           <TabsContent value="settings" className="space-y-6">
             <AIPromptEditor />
           </TabsContent>

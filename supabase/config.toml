@@ -16,3 +16,9 @@ verify_jwt = true
 
 [functions.fetch-calendar-events]
 verify_jwt = true
+
+[functions.send-group-email]
+verify_jwt = true
+
+[functions.draft-group-email]
+verify_jwt = true
