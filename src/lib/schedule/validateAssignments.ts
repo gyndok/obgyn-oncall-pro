@@ -20,7 +20,7 @@ export interface CleanAssignment {
   week_index: number;
 }
 
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export const normalizeLastName = (name: string) => {
   const cleaned = name
