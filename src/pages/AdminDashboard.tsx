@@ -223,7 +223,7 @@ const AdminDashboard = () => {
       const {
         data: doctorsData,
         error: doctorsError
-      } = await supabase.from('doctors').select('*').order('name');
+      } = await supabase.from('doctors').select('id, name, email, mobile, active, is_admin, created_at, first_login_at, auth_user_id, account_setup_completed, google_email').order('name');
       if (doctorsError) throw doctorsError;
       setDoctors(doctorsData || []);
       if (activeBlock) {
@@ -1197,7 +1197,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
     const {
       data,
       error
-    } = await supabase.from('doctors').select('*').order('name');
+    } = await supabase.from('doctors').select('id, name, email, mobile, active, is_admin, created_at, first_login_at, auth_user_id, account_setup_completed, google_email').order('name');
     if (error) {
       console.error('Error fetching all doctors:', error);
       return [];
