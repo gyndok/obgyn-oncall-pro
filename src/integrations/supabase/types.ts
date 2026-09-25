@@ -312,6 +312,36 @@ export type Database = {
           },
         ]
       }
+      group_email_log: {
+        Row: {
+          created_at: string
+          failed_count: number
+          id: string
+          recipient_count: number
+          sent_by: string | null
+          sent_count: number
+          subject: string
+        }
+        Insert: {
+          created_at?: string
+          failed_count?: number
+          id?: string
+          recipient_count?: number
+          sent_by?: string | null
+          sent_count?: number
+          subject: string
+        }
+        Update: {
+          created_at?: string
+          failed_count?: number
+          id?: string
+          recipient_count?: number
+          sent_by?: string | null
+          sent_count?: number
+          subject?: string
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           id: string
