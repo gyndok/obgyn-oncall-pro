@@ -25,7 +25,7 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const normalizeLastName = (name: string) => {
   const cleaned = name
     .toLowerCase()
-    .replace(/\bdr\.?\s*/g, "")
+    .replace(/^dr\.?\s+/i, "")
     .replace(/[^a-z\s-]/g, " ")
     .trim();
   const parts = cleaned.split(/\s+/).filter(Boolean);
