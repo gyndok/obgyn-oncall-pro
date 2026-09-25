@@ -686,19 +686,17 @@ const AdminDashboard = () => {
         error
       } = await supabase.functions.invoke('publish-to-calendar', {
         body: {
-          blockId: currentBlock.id,
-          userId: user?.id
+          blockId: currentBlock.id
         }
       });
-      console.log('Supabase function response:', {
-        data,
-        error
-      });
-      if (error) throw error;
+      if (error) {
+        const details = await (error as any).context?.json?.().catch(() => null);
+        throw new Error(details?.error || error.message);
+      }
       if (data.success) {
         setPublishStatus({
           type: 'success',
-          message: `Successfully published ${data.eventsCreated} events to Google Calendar! (${data.callEvents} call events, ${data.offEvents} off events)`
+          message: data.message || `Successfully published ${data.eventsCreated} events to Google Calendar!`
         });
         setLastPublishResult(data);
         await fetchData(); // Refresh to show updated status
@@ -787,18 +785,24 @@ const AdminDashboard = () => {
   const unpublishSchedule = async () => {
     if (!currentBlock || !user) return;
     
+    const { data: countData } = await supabase.functions.invoke('unpublish-schedule', {
+      body: { blockId: currentBlock.id, countOnly: true }
+    });
+    const n = countData?.count ?? 0;
+    if (!window.confirm(`This removes ${n > 0 ? n : 'all'} events for this block from the shared Google calendars. Continue?`)) return;
+
     setUnpublishing(true);
     setUnpublishStatus(null);
     
     try {
       const { data, error } = await supabase.functions.invoke('unpublish-schedule', {
-        body: { 
-          blockId: currentBlock.id,
-          userId: user.id
-        }
+        body: { blockId: currentBlock.id }
       });
       
-      if (error) throw error;
+      if (error) {
+        const details = await (error as any).context?.json?.().catch(() => null);
+        throw new Error(details?.error || error.message);
+      }
       
       if (data.success) {
         setUnpublishStatus({
