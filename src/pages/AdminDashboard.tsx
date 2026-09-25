@@ -1257,7 +1257,7 @@ Confirm all of the following are true; otherwise set \`hard_constraints_passed=f
       notStartedCount,
       progressPercent
     };
-  }, [doctorRequests, doctors]);
+  }, [doctorRequests, doctors, currentBlock]);
 
   // Create doctor status list with full request data
   const doctorStatuses = React.useMemo(() => {
