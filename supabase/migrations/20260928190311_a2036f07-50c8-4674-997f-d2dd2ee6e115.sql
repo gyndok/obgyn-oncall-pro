@@ -1,0 +1,2 @@
+ALTER TABLE public.calendar_publishes DROP CONSTRAINT IF EXISTS calendar_publishes_block_id_date_key;
+CREATE INDEX IF NOT EXISTS calendar_publishes_block_date_idx ON public.calendar_publishes(block_id, date);
