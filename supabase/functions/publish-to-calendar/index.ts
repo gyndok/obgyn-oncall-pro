@@ -172,9 +172,12 @@ serve(async (req) => {
     }).eq('id', blockId);
     if (updateError) throw new Error(`Failed to update block status: ${updateError.message}`);
 
+    const offEvents = planned.filter((p) => p.calendarId === STAFFING_CALENDAR_ID).length;
     return json({
       success: true,
       eventsCreated: created,
+      callEvents: created - offEvents,
+      offEvents,
       eventsDeleted: removed.deleted,
       message: `Published ${created} events to Google Calendar.`,
     });
