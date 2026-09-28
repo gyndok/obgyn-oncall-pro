@@ -13,6 +13,7 @@ const FIXED_REDIRECT = Deno.env.get('GOOGLE_OAUTH_REDIRECT_URI');
 const ALLOWED_HOSTS = [
   'obgyn-oncall-pro.lovable.app',
   'id-preview--9656ff46-4791-4d59-942e-c90df87821f1.lovable.app',
+  '9656ff46-4791-4d59-942e-c90df87821f1.lovableproject.com',
   'localhost',
 ];
 
