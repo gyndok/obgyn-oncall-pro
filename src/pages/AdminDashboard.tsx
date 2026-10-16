@@ -71,6 +71,10 @@ const AdminDashboard = () => {
   const [editStartDate, setEditStartDate] = useState<Date | undefined>();
   const [editEndDate, setEditEndDate] = useState<Date | undefined>();
 
+  // Deadline editing state
+  const [isEditingDeadline, setIsEditingDeadline] = useState(false);
+  const [editDeadline, setEditDeadline] = useState("");
+
   // Doctor management state
   const [showDoctorDialog, setShowDoctorDialog] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<any>(null);
@@ -1107,14 +1111,43 @@ Confirm all of the following are true; otherwise return {"schedule":[]}:
       setIsEditingDates(false);
       setEditStartDate(undefined);
       setEditEndDate(undefined);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update block dates",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveBlockDeadline = async () => {
+    if (!currentBlock) return;
+    setSaving(true);
+    try {
+      const deadlineIso = editDeadline ? new Date(editDeadline).toISOString() : null;
+      const { error } = await supabase.from('blocks').update({
+        deadline: deadlineIso
+      }).eq('id', currentBlock.id);
+      if (error) throw error;
+      setCurrentBlock({
+        ...currentBlock,
+        deadline: deadlineIso
+      });
+      toast({
+        title: "Success",
+        description: deadlineIso ? `Deadline updated: ${format(new Date(deadlineIso), 'MMM d, yyyy h:mm a')}` : "Deadline cleared"
+      });
+      setIsEditingDeadline(false);
 
       // Fetch fresh data from database
       await fetchData();
     } catch (error) {
-      console.error('Error updating block dates:', error);
+      console.error('Error updating block deadline:', error);
       toast({
         title: "Error",
-        description: "Failed to update block dates",
+        description: "Failed to update deadline",
         variant: "destructive"
       });
     } finally {
@@ -1757,7 +1790,36 @@ Confirm all of the following are true; otherwise return {"schedule":[]}:
                       <p className="text-sm text-muted-foreground mt-1">
                         {currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMM d, h:mm a') : 'No deadline set'}
                       </p>
-                    </CardContent>
+                      {isEditingDeadline ? (
+                        <div className="mt-2 space-y-2">
+                          <Input
+                            type="datetime-local"
+                            value={editDeadline}
+                            onChange={e => setEditDeadline(e.target.value)}
+                          />
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={saveBlockDeadline} disabled={saving}>
+                              <Save className="h-3 w-3 mr-1" /> Save
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setIsEditingDeadline(false)} disabled={saving}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2"
+                          onClick={() => {
+                            setEditDeadline(currentBlock.deadline ? format(new Date(currentBlock.deadline), "yyyy-MM-dd'T'HH:mm") : "");
+                            setIsEditingDeadline(true);
+                          }}
+                        >
+                          <Edit className="h-3 w-3 mr-1" /> Change deadline
+                        </Button>
+                      )}
+                     </CardContent>
                   </Card>
 
                   <Card className="bg-gradient-card shadow-soft">
