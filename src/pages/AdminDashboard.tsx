@@ -71,6 +71,10 @@ const AdminDashboard = () => {
   const [editStartDate, setEditStartDate] = useState<Date | undefined>();
   const [editEndDate, setEditEndDate] = useState<Date | undefined>();
 
+  // Deadline editing state
+  const [isEditingDeadline, setIsEditingDeadline] = useState(false);
+  const [editDeadline, setEditDeadline] = useState("");
+
   // Doctor management state
   const [showDoctorDialog, setShowDoctorDialog] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<any>(null);
@@ -1107,6 +1111,35 @@ Confirm all of the following are true; otherwise return {"schedule":[]}:
       setIsEditingDates(false);
       setEditStartDate(undefined);
       setEditEndDate(undefined);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update block dates",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveBlockDeadline = async () => {
+    if (!currentBlock) return;
+    setSaving(true);
+    try {
+      const deadlineIso = editDeadline ? new Date(editDeadline).toISOString() : null;
+      const { error } = await supabase.from('blocks').update({
+        deadline: deadlineIso
+      }).eq('id', currentBlock.id);
+      if (error) throw error;
+      setCurrentBlock({
+        ...currentBlock,
+        deadline: deadlineIso
+      });
+      toast({
+        title: "Success",
+        description: deadlineIso ? `Deadline updated: ${format(new Date(deadlineIso), 'MMM d, yyyy h:mm a')}` : "Deadline cleared"
+      });
+      setIsEditingDeadline(false);
 
       // Fetch fresh data from database
       await fetchData();
