@@ -475,33 +475,30 @@ const AdminDashboard = () => {
       const importedAssignments: RawAssignment[] = [];
 
       
-      // Handle structured ChatGPT JSON format
-      if (scheduleData.assignments && Array.isArray(scheduleData.assignments)) {
-        // This is the structured format from ChatGPT
-        for (const entry of scheduleData.assignments) {
+      // Handle structured ChatGPT JSON format ("assignments" or "schedule" key)
+      const structured = scheduleData.assignments ?? scheduleData.schedule;
+      if (structured && Array.isArray(structured)) {
+        for (const entry of structured) {
           const date = entry.date;
-          const doctorName = entry.doctor?.toLowerCase();
-          const isWeekend = entry.is_weekend;
-          const weekIndex = entry.week_index;
-          const weekdayName = entry.weekday;
-          
-          if (!date || !doctorName) {
+          const doctor = entry.doctor ?? entry.doctor_name;
+
+          if (!date || !doctor) {
             console.warn(`Missing date or doctor in entry:`, entry);
             continue;
           }
-          
-          importedAssignments.push({ date, doctor_name: entry.doctor });
+
+          importedAssignments.push({ date, doctor_name: doctor });
         }
       } else {
         // Handle simple array format or single entries
         const entries = Array.isArray(scheduleData) ? scheduleData : [scheduleData];
-        
+
         for (const entry of entries) {
           const date = entry.date || entry.Date;
-          const doctorName = (entry.doctor || entry.Doctor || entry.name || entry.Name)?.toLowerCase();
-          
-          if (!date || !doctorName) continue;
-          importedAssignments.push({ date: String(date), doctor_name: entry.doctor || entry.Doctor || entry.name || entry.Name });
+          const doctor = entry.doctor || entry.Doctor || entry.doctor_name || entry.name || entry.Name;
+
+          if (!date || !doctor) continue;
+          importedAssignments.push({ date: String(date), doctor_name: doctor });
         }
       }
       
