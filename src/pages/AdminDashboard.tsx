@@ -1144,10 +1144,10 @@ Confirm all of the following are true; otherwise return {"schedule":[]}:
       // Fetch fresh data from database
       await fetchData();
     } catch (error) {
-      console.error('Error updating block dates:', error);
+      console.error('Error updating block deadline:', error);
       toast({
         title: "Error",
-        description: "Failed to update block dates",
+        description: "Failed to update deadline",
         variant: "destructive"
       });
     } finally {
@@ -1790,7 +1790,36 @@ Confirm all of the following are true; otherwise return {"schedule":[]}:
                       <p className="text-sm text-muted-foreground mt-1">
                         {currentBlock.deadline ? format(new Date(currentBlock.deadline), 'MMM d, h:mm a') : 'No deadline set'}
                       </p>
-                    </CardContent>
+                      {isEditingDeadline ? (
+                        <div className="mt-2 space-y-2">
+                          <Input
+                            type="datetime-local"
+                            value={editDeadline}
+                            onChange={e => setEditDeadline(e.target.value)}
+                          />
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={saveBlockDeadline} disabled={saving}>
+                              <Save className="h-3 w-3 mr-1" /> Save
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setIsEditingDeadline(false)} disabled={saving}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2"
+                          onClick={() => {
+                            setEditDeadline(currentBlock.deadline ? format(new Date(currentBlock.deadline), "yyyy-MM-dd'T'HH:mm") : "");
+                            setIsEditingDeadline(true);
+                          }}
+                        >
+                          <Edit className="h-3 w-3 mr-1" /> Change deadline
+                        </Button>
+                      )}
+                     </CardContent>
                   </Card>
 
                   <Card className="bg-gradient-card shadow-soft">
