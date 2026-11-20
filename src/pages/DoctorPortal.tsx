@@ -91,6 +91,8 @@ const getHolidayInfo = (date: Date) => {
 const isHoliday = (date: Date) => {
   return !!getHolidayInfo(date);
 };
+const REQUESTS_URL = "https://obgyn-call-schedule.vercel.app/#requests";
+
 const DoctorPortal = () => {
   const {
     user,
@@ -439,7 +441,7 @@ const DoctorPortal = () => {
                 </Button>
               </div>
             </div>
-            <p className="subheading-dashboard">Submit your time-off requests and weekend preferences for the upcoming call block.</p>
+            <p className="subheading-dashboard">Submit your requests on the new requests site (see the Preferences tab).</p>
           </div>
 
           {/* Block Information */}
@@ -485,245 +487,22 @@ const DoctorPortal = () => {
 
             {/* Preferences Tab */}
             <TabsContent value="preferences" className="space-dashboard">
-              {!currentBlock ? <Card className="card-stats"><CardContent className="py-12 text-center">
-                  <CalendarIcon className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                  <p className="text-lg font-medium">No request period is open right now.</p>
-                  <p className="text-muted-foreground">Check back later or contact the scheduler.</p>
-                </CardContent></Card> : <>
-              <div role="status" className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 ${deadlinePast ? 'border-destructive bg-destructive/10 text-destructive' : hoursLeft !== null && hoursLeft <= 48 ? 'border-warning bg-warning/10 text-warning' : 'border-border bg-muted/40'}`}>
-                <span className="flex items-center gap-2 font-medium">
-                  <Clock className="h-4 w-4" />
-                  {!deadlineDate ? 'No deadline set' : deadlinePast ? `Requests closed ${format(deadlineDate, 'EEE MMM d, h:mm a')}` : `Requests due in ${formatDistanceToNowStrict(deadlineDate)} (${format(deadlineDate, 'EEE MMM d, h:mm a')})`}
-                </span>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${chip.cls}`}>{chip.label}</span>
-              </div>
-              <div className="grid lg:grid-cols-2 gap-6">
-                {/* Unavailable Dates */}
-                <Card className="card-stats hover-lift">
-                  <CardHeader>
-                    <CardTitle className="text-xl text-primary">Unavailable Dates</CardTitle>
-                    <CardDescription>
-                      Select any dates you are not available for call duties (hard excludes)
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {/* Custom 7x7 Calendar Grid */}
-                    <div className="space-y-4">
-                      {/* Day Headers */}
-                      <div className="grid grid-cols-7 gap-1 mb-2">
-                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <div key={day} className="text-center text-xs sm:text-sm font-medium text-muted-foreground py-2">
-                            {day}
-                          </div>)}
-                      </div>
-
-                      {/* 7x7 Date Grid */}
-                      <div className="grid grid-cols-7 gap-1">
-                        {(() => {
-                        // Parse the start date and find the actual Monday
-                        const startDate = parseLocalDate(currentBlock.start_monday_date);
-                        // Get the day of week (0=Sunday, 1=Monday, etc.)
-                        const dayOfWeek = startDate.getDay();
-                        // Calculate how many days to subtract to get to Monday
-                        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-                        // Get the actual Monday
-                        const actualMonday = addDays(startDate, -daysToMonday);
-                        const dates = [];
-
-                        // Generate dates dynamically based on block dates
-                        const blockEndDate = parseLocalDate(currentBlock.end_sunday_date);
-                        const blockDays = Math.round((blockEndDate.getTime() - actualMonday.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                        const weekCount = Math.round(blockDays / 7);
-                        for (let week = 0; week < weekCount; week++) {
-                          for (let day = 0; day < 7; day++) {
-                            const currentDate = addDays(addWeeks(actualMonday, week), day);
-                            const dateString = format(currentDate, 'yyyy-MM-dd');
-                            const isSelected = selectedUnavailableDates.some(selectedDate => format(selectedDate, 'yyyy-MM-dd') === dateString);
-                            const holidayInfo = getHolidayInfo(currentDate);
-                            const isHolidayDate = !!holidayInfo;
-                            dates.push(<button key={dateString} type="button" disabled={!canEdit} aria-pressed={isSelected} aria-label={`${format(currentDate, 'EEEE, MMMM d, yyyy')}${holidayInfo ? `, ${holidayInfo.name}` : ''}${isSelected ? ', unavailable' : ''}`} title={holidayInfo ? holidayInfo.name : undefined} onClick={() => {
-                              if (rangeMode) {
-                                if (!rangeAnchor) { setRangeAnchor(currentDate); return; }
-                                const [a, b] = rangeAnchor <= currentDate ? [rangeAnchor, currentDate] : [currentDate, rangeAnchor];
-                                toggleDates(eachDayOfInterval({ start: a, end: b }), true);
-                                setRangeAnchor(null);
-                                return;
-                              }
-                              toggleDates([currentDate], !isSelected);
-                            }} className={`
-                                    aspect-square p-1 sm:p-2 text-xs sm:text-sm border rounded-md transition-all relative min-h-[40px] sm:min-h-[48px]
-                                    ${rangeAnchor && isSameDay(rangeAnchor, currentDate) ? 'ring-2 ring-primary ' : ''}${isSelected ? 'bg-destructive text-destructive-foreground border-destructive shadow-md' : isHolidayDate ? 'bg-accent/10 border-accent text-accent hover:bg-accent/20 font-semibold' : 'bg-background border-border hover:bg-muted hover:border-muted-foreground'}
-                                    ${!canEdit ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 active:scale-95'}
-                                  `}>
-                                  <div className="flex flex-col items-center justify-center h-full">
-                                    <span className="font-medium">{format(currentDate, 'd')}</span>
-                                    <span className="text-xs opacity-75 hidden sm:block">{format(currentDate, 'MMM')}</span>
-                                    {isHolidayDate && <Star className="h-2 w-2 absolute top-1 right-1" />}
-                                    {isSelected && <Check className="h-3 w-3 absolute bottom-0.5 right-0.5" aria-hidden="true" />}
-                                  </div>
-                                </button>);
-                          }
-                        }
-                        return dates;
-                      })()}
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2 mt-3">
-                        <Button type="button" size="sm" variant={rangeMode ? 'default' : 'outline'} disabled={!canEdit} onClick={() => { setRangeMode(!rangeMode); setRangeAnchor(null); }}>
-                          {rangeMode ? (rangeAnchor ? 'Tap end date' : 'Tap start date') : 'Select a range'}
-                        </Button>
-                        {(() => {
-                          const start = parseLocalDate(currentBlock.start_monday_date);
-                          const end = parseLocalDate(currentBlock.end_sunday_date);
-                          const weeks = Math.round((end.getTime() - start.getTime()) / 86400000 + 1) / 7;
-                          return Array.from({ length: weeks }, (_, w) => {
-                            const days = eachDayOfInterval({ start: addWeeks(start, w), end: addDays(addWeeks(start, w), 6) });
-                            const all = days.every(d => selectedUnavailableDates.some(s => isSameDay(s, d)));
-                            return <Button key={w} type="button" size="sm" variant={all ? 'secondary' : 'outline'} disabled={!canEdit} aria-pressed={all} onClick={() => toggleDates(days, !all)}>
-                              Week {w + 1}
-                            </Button>;
-                          });
-                        })()}
-                        <span className="text-sm text-muted-foreground ml-auto">{selectedUnavailableDates.length} day{selectedUnavailableDates.length === 1 ? '' : 's'} selected</span>
-                      </div>
-
-                      {/* Legend */}
-                      <div className="flex flex-wrap gap-3 sm:gap-4 text-xs text-muted-foreground mt-4 pt-4 border-t">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-destructive border rounded"></div>
-                          <span>Unavailable</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-accent/10 border-accent border rounded relative">
-                            <Star className="h-1.5 w-1.5 sm:h-2 sm:w-2 absolute top-0.5 right-0.5 text-accent" />
-                          </div>
-                          <span>Holiday</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-background border rounded"></div>
-                          <span>Available</span>
-                        </div>
-                      </div>
-                    </div>
-                    {selectedUnavailableDates.length > 0 && <div className="mt-4">
-                        <Label className="text-sm font-medium">Selected Unavailable Dates:</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedUnavailableDates.map(date => <Badge key={date.toISOString()} variant="secondary" className="text-xs">
-                              {format(date, 'MMM d, yyyy')}
-                            </Badge>)}
-                        </div>
-                      </div>}
-                  </CardContent>
-                </Card>
-
-                {/* Weekend Preferences */}
-                <Card className="card-stats hover-lift">
-                  <CardHeader>
-                    <CardTitle className="text-xl text-primary">Weekend Preferences</CardTitle>
-                    <CardDescription className="text-sm sm:text-base">Select your preferred weekend(s) for call duties (Friday-Sunday blocks).  </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {weekends.map(weekend => {
-                      // Find doctors who have already requested this weekend
-                      const othersCount = summary?.weekend_counts?.[String(weekend.id)] ?? 0;
-                      return <div key={weekend.id} className="flex items-start space-x-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                            <Checkbox id={`weekend-${weekend.id}`} checked={preferredWeekends.includes(weekend.id)} onCheckedChange={checked => {
-                          if (checked) {
-                            setPreferredWeekends([...preferredWeekends, weekend.id]);
-                          } else {
-                            setPreferredWeekends(preferredWeekends.filter(id => id !== weekend.id));
-                          }
-                        }} disabled={!canEdit} className="mt-0.5 flex-shrink-0" />
-                            <Label htmlFor={`weekend-${weekend.id}`} className="flex-1 cursor-pointer">
-                              <div className="font-medium text-sm sm:text-base">{weekend.label}</div>
-                              <div className="text-xs sm:text-sm text-muted-foreground">{weekend.dates}</div>
-                              {othersCount > 0 && <div className="text-xs text-destructive mt-1">
-                                  {othersCount} other{othersCount === 1 ? '' : 's'} picked this weekend
-                                </div>}
-                            </Label>
-                          </div>;
-                    })}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Notes */}
               <Card className="card-stats">
                 <CardHeader>
-                  <CardTitle className="text-xl text-primary">Additional Notes</CardTitle>
-                  <CardDescription>
-                    Any additional information or special requests (optional)
-                  </CardDescription>
+                  <CardTitle className="text-xl text-primary">Requests have moved to a new site</CardTitle>
+                  <CardDescription>Time-off requests and weekend preferences are no longer submitted here.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Textarea placeholder="Enter any additional notes or special requests..." value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[80px] sm:min-h-[100px] text-sm sm:text-base" disabled={!canEdit} />
+                <CardContent className="space-y-4">
+                  <ul className="list-disc pl-5 space-y-1 text-sm sm:text-base">
+                    <li>Sign in with the <strong>same email and password</strong> you use here.</li>
+                    <li>Or choose the <strong>one-time code (OTP)</strong> option and enter the code emailed to you.</li>
+                  </ul>
+                  <Button asChild className="btn-primary-glow w-full sm:w-auto">
+                    <a href={REQUESTS_URL} target="_blank" rel="noopener noreferrer">Go to the requests site</a>
+                  </Button>
+                  <p className="text-xs text-muted-foreground break-all">{REQUESTS_URL}</p>
                 </CardContent>
               </Card>
-
-              {/* Submission Status */}
-              {isSubmitted && canEdit && <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription className="text-sm sm:text-base">
-                    <strong>Preferences Submitted:</strong> Your call preferences have been submitted successfully. 
-                    You can still modify your submission until the block is closed for scheduling.
-                  </AlertDescription>
-                </Alert>}
-
-              {isSubmitted && !canEdit && <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="text-sm sm:text-base">
-                    <strong>Block Closed:</strong> This call block has been closed for scheduling. 
-                    Your preferences are locked and cannot be modified.
-                  </AlertDescription>
-                </Alert>}
-
-              {!isSubmitted && !canEdit && <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription className="text-sm sm:text-base">
-                    <strong>Block Closed:</strong> This call block has been closed. 
-                    New submissions are no longer accepted.
-                  </AlertDescription>
-                </Alert>}
-
-              {/* Action Buttons */}
-              <div className="fixed inset-x-0 bottom-0 z-40 flex gap-2 border-t bg-background/95 p-3 backdrop-blur sm:static sm:z-auto sm:flex-row sm:gap-4 sm:border-0 sm:bg-transparent sm:p-0 [&>button]:flex-1 sm:[&>button]:flex-none">
-                {!isSubmitted && <Button variant="outline" onClick={handleSaveDraft} disabled={!canEdit || saving} className="btn-outline-modern">
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? "Saving..." : "Save Draft"}
-                </Button>}
-                <Button onClick={() => setConfirmOpen(true)} disabled={!canEdit || saving} className="btn-primary-glow">
-                  <Send className="h-4 w-4 mr-2" />
-                  {saving ? "Submitting..." : isSubmitted ? "Update Submission" : "Submit Preferences"}
-                </Button>
-              </div>
-              <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Submit your requests?</DialogTitle>
-                    <DialogDescription>Please check everything before submitting.</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <p className="font-medium">Unavailable dates ({selectedUnavailableDates.length})</p>
-                      <p className="text-muted-foreground">{selectedUnavailableDates.length ? [...selectedUnavailableDates].sort((a, b) => a.getTime() - b.getTime()).map(d => format(d, 'EEE MMM d')).join(', ') : 'None'}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Preferred weekends</p>
-                      <p className="text-muted-foreground">{preferredWeekends.length ? [...preferredWeekends].sort((a, b) => a - b).map(w => `Week ${w}`).join(', ') : 'None'}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Notes</p>
-                      <p className="text-muted-foreground whitespace-pre-wrap">{notes.trim() || 'None'}</p>
-                    </div>
-                  </div>
-                  <DialogFooter className="gap-2">
-                    <Button variant="outline" onClick={() => setConfirmOpen(false)}>Go back</Button>
-                    <Button onClick={() => { setConfirmOpen(false); handleSubmit(); }}>Submit</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-              </>}
             </TabsContent>
 
             {/* Team Status Tab */}
