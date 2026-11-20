@@ -154,6 +154,296 @@ export type Database = {
           },
         ]
       }
+      cs_assignments: {
+        Row: {
+          block_id: string
+          date: string
+          doctor_id: string
+          updated_at: string
+        }
+        Insert: {
+          block_id: string
+          date: string
+          doctor_id: string
+          updated_at?: string
+        }
+        Update: {
+          block_id?: string
+          date?: string
+          doctor_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_assignments_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "cs_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_assignments_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "cs_doctors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cs_blocks: {
+        Row: {
+          created_at: string
+          deadline: string | null
+          id: string
+          published_at: string | null
+          start_date: string
+          status: string
+          weeks: number
+        }
+        Insert: {
+          created_at?: string
+          deadline?: string | null
+          id?: string
+          published_at?: string | null
+          start_date: string
+          status?: string
+          weeks: number
+        }
+        Update: {
+          created_at?: string
+          deadline?: string | null
+          id?: string
+          published_at?: string | null
+          start_date?: string
+          status?: string
+          weeks?: number
+        }
+        Relationships: []
+      }
+      cs_changes: {
+        Row: {
+          block_id: string
+          created_at: string
+          date: string
+          from_doctor: string | null
+          id: number
+          to_doctor: string | null
+        }
+        Insert: {
+          block_id: string
+          created_at?: string
+          date: string
+          from_doctor?: string | null
+          id?: never
+          to_doctor?: string | null
+        }
+        Update: {
+          block_id?: string
+          created_at?: string
+          date?: string
+          from_doctor?: string | null
+          id?: never
+          to_doctor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_changes_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "cs_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_changes_from_doctor_fkey"
+            columns: ["from_doctor"]
+            isOneToOne: false
+            referencedRelation: "cs_doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_changes_to_doctor_fkey"
+            columns: ["to_doctor"]
+            isOneToOne: false
+            referencedRelation: "cs_doctors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cs_doctors: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          is_admin: boolean
+          name: string
+          sort: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_admin?: boolean
+          name: string
+          sort?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_admin?: boolean
+          name?: string
+          sort?: number
+        }
+        Relationships: []
+      }
+      cs_login_codes: {
+        Row: {
+          email: string
+          id: number
+          sent_at: string
+        }
+        Insert: {
+          email: string
+          id?: never
+          sent_at?: string
+        }
+        Update: {
+          email?: string
+          id?: never
+          sent_at?: string
+        }
+        Relationships: []
+      }
+      cs_requests: {
+        Row: {
+          block_id: string
+          doctor_id: string
+          notes: string
+          submitted_at: string | null
+          unavailable_dates: string[]
+          updated_at: string
+          weekend_ranks: number[]
+        }
+        Insert: {
+          block_id: string
+          doctor_id: string
+          notes?: string
+          submitted_at?: string | null
+          unavailable_dates?: string[]
+          updated_at?: string
+          weekend_ranks?: number[]
+        }
+        Update: {
+          block_id?: string
+          doctor_id?: string
+          notes?: string
+          submitted_at?: string | null
+          unavailable_dates?: string[]
+          updated_at?: string
+          weekend_ranks?: number[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_requests_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "cs_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_requests_doctor_id_fkey"
+            columns: ["doctor_id"]
+            isOneToOne: false
+            referencedRelation: "cs_doctors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cs_settings: {
+        Row: {
+          key: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      cs_trades: {
+        Row: {
+          block_id: string
+          calendar_status: string | null
+          created_at: string
+          decided_at: string | null
+          give_dates: string[]
+          id: string
+          note: string
+          partner_id: string
+          proposer_id: string
+          status: string
+          take_dates: string[]
+        }
+        Insert: {
+          block_id: string
+          calendar_status?: string | null
+          created_at?: string
+          decided_at?: string | null
+          give_dates: string[]
+          id?: string
+          note?: string
+          partner_id: string
+          proposer_id: string
+          status?: string
+          take_dates: string[]
+        }
+        Update: {
+          block_id?: string
+          calendar_status?: string | null
+          created_at?: string
+          decided_at?: string | null
+          give_dates?: string[]
+          id?: string
+          note?: string
+          partner_id?: string
+          proposer_id?: string
+          status?: string
+          take_dates?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cs_trades_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "cs_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_trades_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "cs_doctors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cs_trades_proposer_id_fkey"
+            columns: ["proposer_id"]
+            isOneToOne: false
+            referencedRelation: "cs_doctors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       doctor_requests: {
         Row: {
           block_id: string
@@ -392,6 +682,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cs_apply_trade: { Args: { p_trade: string }; Returns: undefined }
+      cs_calendar_feed: {
+        Args: { p_token: string }
+        Returns: {
+          date: string
+          doctor_id: string
+          doctor_name: string
+        }[]
+      }
+      cs_is_admin: { Args: never; Returns: boolean }
+      cs_me: { Args: never; Returns: string }
+      cs_replace_assignments: {
+        Args: { p_block: string; p_rows: Json }
+        Returns: undefined
+      }
       get_block_request_summary: { Args: { p_block_id: string }; Returns: Json }
       link_my_doctor_account: { Args: never; Returns: undefined }
       replace_block_assignments: {
